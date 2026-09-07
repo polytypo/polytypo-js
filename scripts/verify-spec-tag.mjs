@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // CLI wrapper around scripts/lib/spec-tag.mjs, used by .github/workflows/release.yml's verify
-// job. Reads spec/VERSION from this checkout and takes the expected release commit as argv[2]
-// (the workflow passes the tag-triggering commit, `${{ github.sha }}`, via an env var). Exits
-// non-zero with a GitHub Actions `::error::` annotation on any failure — missing spec tag, tag
-// pointing at the wrong commit, malformed spec/VERSION, or a nonexistent expected commit.
+// job. Reads spec/VERSION from this checkout (the vendored copy — see spec/README.md) and takes
+// the expected release commit as argv[2] (the workflow passes the tag-triggering commit,
+// `${{ github.sha }}`, via an env var). The canonical spec tag itself is resolved over the GitHub
+// API against polytypo/polytypo, not this checkout — see scripts/lib/spec-tag.mjs. Exits non-zero
+// with a GitHub Actions `::error::` annotation on any failure — missing spec tag, tag pointing at
+// the wrong commit, malformed spec/VERSION, a nonexistent expected commit, or an unreachable
+// GitHub API.
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -22,7 +25,7 @@ const specVersionRaw = await readFile(path.join(ROOT, "spec", "VERSION"), "utf8"
 console.log(`spec/VERSION:           ${specVersionRaw.trim()}`);
 console.log(`expected release commit: ${expectedCommitSha}`);
 
-const result = verifySpecTag({ specVersionRaw, expectedCommitSha, cwd: ROOT });
+const result = await verifySpecTag({ specVersionRaw, expectedCommitSha, cwd: ROOT });
 if (!result.ok) {
   console.error(`::error::${result.reason}`);
   process.exit(1);
