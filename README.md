@@ -17,10 +17,14 @@
   one portable spec, designed for byte-identical output across runtimes.
 </p>
 
+<p align="center">
+  <strong>Try it live, no install: <a href="https://polytypo.dev/">polytypo.dev</a></strong>
+</p>
+
 This is the JavaScript/TypeScript implementation. The full spec — all locales, all rules, worked
-examples in each — lives at [polytypo.dev](https://polytypo.dev/) and in
-[polytypo/polytypo](https://github.com/polytypo/polytypo). **No install needed to try it: paste
-your own text into the [browser playground](https://polytypo.dev/playground/).**
+examples in each — lives in [polytypo/polytypo](https://github.com/polytypo/polytypo). The
+[browser playground](https://polytypo.dev/playground/) runs this exact package, compiled to a
+browser bundle — paste your own text to try it against any locale before installing anything.
 
 ## Install
 
