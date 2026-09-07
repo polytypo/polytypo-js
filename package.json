@@ -1,6 +1,6 @@
 {
   "name": "polytypo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Multilingual microtypography: locale-correct quotes, dashes, ellipses and no-break spaces.",
   "keywords": [
     "typography",
