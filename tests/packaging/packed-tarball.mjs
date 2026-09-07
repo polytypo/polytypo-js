@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import ts from "typescript";
 import { parseTarballArg } from "../../scripts/lib/cli-args.mjs";
+import { parseNpmPackJson } from "../../scripts/lib/npm-pack-json.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TSC_BIN = path.join(ROOT, "node_modules", ".bin", "tsc");
@@ -78,7 +79,7 @@ try {
     await mkdir(tarballDir);
     console.log(`\npacking (real npm pack, not --dry-run) into ${tarballDir}...`);
     const packOut = run("npm", ["pack", "--pack-destination", tarballDir, "--json"], { cwd: ROOT });
-    const [packResult] = JSON.parse(packOut.stdout);
+    const [packResult] = parseNpmPackJson(packOut.stdout);
     tarballPath = path.join(tarballDir, packResult.filename);
     console.log(`tarball: ${tarballPath} (${packResult.size} bytes packed)`);
   }

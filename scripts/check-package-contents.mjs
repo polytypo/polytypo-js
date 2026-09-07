@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { parseTarballArg } from "./lib/cli-args.mjs";
 import { assertPackageContents } from "./lib/package-contents.mjs";
+import { parseNpmPackJson } from "./lib/npm-pack-json.mjs";
 
 const execFileAsync = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -49,7 +50,7 @@ async function fromBuiltDist() {
     cwd: ROOT,
     maxBuffer: 16 * 1024 * 1024,
   });
-  const [packResult] = JSON.parse(stdout);
+  const [packResult] = parseNpmPackJson(stdout);
   const files = new Set(packResult.files.map((f) => f.path));
 
   const pkg = JSON.parse(await readFile(path.join(ROOT, "package.json"), "utf8"));

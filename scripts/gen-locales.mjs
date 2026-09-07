@@ -314,4 +314,8 @@ const lines = [
 
 mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, lines.join("\n"), "utf8");
-console.log(`gen-locales: wrote ${outPath} (${locales.size} locale(s), spec ${specVersion})`);
+// stderr, not stdout: this script runs as part of "prepare" during `npm pack`/`npm publish`
+// (needed for git-dependency installs), and stdout must stay clean JSON for callers that parse
+// `npm pack --json`'s output (scripts/check-package-contents.mjs, tests/packaging/packed-tarball.mjs,
+// release.yml's pack step) — npm does not offer a way to suppress prepare's own script output.
+console.error(`gen-locales: wrote ${outPath} (${locales.size} locale(s), spec ${specVersion})`);
