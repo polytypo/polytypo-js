@@ -1,13 +1,21 @@
-# polytypo
+<p align="center">
+  <img src="https://raw.githubusercontent.com/polytypo/polytypo/main/brand/logo/polytypo-lockup-stacked.svg" alt="polytypo" width="260">
+</p>
 
-[![npm version](https://img.shields.io/npm/v/polytypo.svg)](https://www.npmjs.com/package/polytypo)
-[![CI](https://github.com/polytypo/polytypo-js/actions/workflows/ci.yml/badge.svg)](https://github.com/polytypo/polytypo-js/actions/workflows/ci.yml)
-[![npm downloads](https://img.shields.io/npm/dm/polytypo.svg)](https://www.npmjs.com/package/polytypo)
-[![jsDelivr hits](https://data.jsdelivr.com/v1/package/npm/polytypo/badge)](https://www.jsdelivr.com/package/npm/polytypo)
-[![License: MIT](https://img.shields.io/npm/l/polytypo.svg)](LICENSE)
+<h1 align="center">polytypo</h1>
 
-Locale-correct quotes, dashes, ellipses, apostrophes, symbols and no-break spaces — one portable
-spec, designed for byte-identical output across runtimes.
+<p align="center">
+  <a href="https://www.npmjs.com/package/polytypo"><img src="https://img.shields.io/npm/v/polytypo.svg" alt="npm version"></a>
+  <a href="https://github.com/polytypo/polytypo-js/actions/workflows/ci.yml"><img src="https://github.com/polytypo/polytypo-js/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/polytypo"><img src="https://img.shields.io/npm/dm/polytypo.svg" alt="npm downloads"></a>
+  <a href="https://www.jsdelivr.com/package/npm/polytypo"><img src="https://data.jsdelivr.com/v1/package/npm/polytypo/badge" alt="jsDelivr hits"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/npm/l/polytypo.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center">
+  Locale-correct quotes, dashes, ellipses, apostrophes, symbols and no-break spaces —<br>
+  one portable spec, designed for byte-identical output across runtimes.
+</p>
 
 This is the JavaScript/TypeScript implementation. The full spec — all locales, all rules, worked
 examples in each — lives at [polytypo.dev](https://polytypo.dev/) and in
