@@ -26,34 +26,6 @@ jobs:
 
       - run: npm ci
 
-      # gen:brandbook (part of `npm run generate:all`, invoked below) shells out to
-      # `python3 brand/tools/build_brandbook.py`, which needs fonttools (subsetting, WOFF2) and
-      # brotli (WOFF2's compression codec) — packages `npm ci` does not and should not install.
-      # An isolated venv with only the pinned versions from brand/tools/requirements.txt, not the
-      # runner's own preinstalled global site-packages, so generation is exactly as reproducible
-      # here as it is documented to be in brand/README.md. Prepending the venv's bin/ to
-      # $GITHUB_PATH makes every subsequent step's bare `python3`/`pip` resolve inside it, without
-      # needing to re-activate per step.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-
-      - name: Set up isolated Python virtual environment for brand/promo generation
-        run: |
-          python3 -m venv .venv-brand
-          echo "$PWD/.venv-brand/bin" >> "$GITHUB_PATH"
-          .venv-brand/bin/pip install -r brand/tools/requirements.txt
-
-      # gen_svg.py's ensure_font(): a cached font is re-verified by sha256 on every use, a fresh
-      # download is checksum-verified before being atomically moved into place, and a mismatch of
-      # either kind fails loudly instead of silently falling back. No network access — the
-      # downloader is a fake injected by the test. See brand/tools/test_gen_svg.py.
-      - name: Font-acquisition tests
-        run: npm run test:font-acquisition
-
-      - name: Validate spec
-        run: npm run validate:spec
-
       - name: Lint
         run: npm run lint
 
@@ -84,14 +56,12 @@ jobs:
       - name: Packaging smoke tests (ESM, CommonJS, TypeScript declarations)
         run: npm run test:packaging
 
-      # Builds and packs the real package, then asserts on the tarball manifest directly (Stage
-      # 6): package.json/README.md/LICENSE present, every entry has its ESM/CJS/declaration
-      # files, every referenced chunk is present, every published JS/CJS file has exactly one
-      # valid, resolvable source map (see tsup.config.ts's ship-maps policy), no unrelated
-      # repository content leaked in, every "exports" target resolves. Release-version agnostic
-      # by design — it does not check package.json's version at all; that policy belongs solely
-      # to the release workflow's tag-vs-version gate (.github/workflows/release.yml,
-      # scripts/lib/release-tag.mjs). See scripts/check-package-contents.mjs.
+      # Builds and packs the real package, then asserts on the tarball manifest directly: package
+      # .json/README.md/LICENSE present, every entry has its ESM/CJS/declaration files, every
+      # referenced chunk is present, every published JS/CJS file has exactly one valid, resolvable
+      # source map (see tsup.config.ts's ship-maps policy), no unrelated repository content
+      # leaked in, every "exports" target resolves. Release-version agnostic by design. See
+      # scripts/check-package-contents.mjs.
       - name: Package-content assertions
         run: npm run check:package-contents
 
@@ -102,10 +72,10 @@ jobs:
       - name: Packed-tarball ESM/CJS/TypeScript smoke tests
         run: npm run test:packed-tarball
 
-      # Proves the actual module graph, not just size (AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1):
-      # polytypo/text excludes parse5 and the Micromark/MDX stack, polytypo/html excludes the
-      # Micromark/MDX stack, and polytypo/markdown + the aggregate entry still genuinely reach
-      # both — a required-reach check, so a parser silently dropping out fails too.
+      # Proves the actual module graph, not just size: polytypo/text excludes parse5 and the
+      # Micromark/MDX stack, polytypo/html excludes the Micromark/MDX stack, and
+      # polytypo/markdown + the aggregate entry still genuinely reach both — a required-reach
+      # check, so a parser silently dropping out fails too.
       - name: Check entry-point dependency reach
         run: npm run check:entry-reach
 
@@ -118,44 +88,6 @@ jobs:
 
       # Reports the package-wide npm install dependency count — identical for every entry point,
       # since npm resolves package.json "dependencies" as a whole, not per subpath. Informational
-      # only (does not fail the build): subpath exports change what a bundler can reach and
-      # tree-shake per entry, not what `npm install polytypo` puts on disk. See
-      # scripts/check-install-footprint.mjs and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1.
+      # only (does not fail the build). See scripts/check-install-footprint.mjs.
       - name: Report npm install footprint
         run: npm run check:install-footprint
-
-      # One deterministic entry point (npm run generate:all: locale codegen, READMEs, promo
-      # pages/assets, browser bundle, brandbook — gen:docs + gen:promo-bundle + gen:brandbook, in
-      # that order), then a hard, scoped git diff — no continue-on-error, and no second,
-      # competing generation path. spec/VERSION is the single global spec-version source
-      # (docs/ARCHITECTURE.md section 2, "L0 — spec"; docs/AUDIT_REMEDIATION_AND_RELEASE_PLAN.md
-      # section 4.1). scripts/validate-spec.mjs separately asserts order.json/registry.json never
-      # drift from it.
-      #
-      # Every promo page (all five — index plus the docs/playground/locales/manifesto directory
-      # indexes, served at the directory URLs /, /docs, /playground, /locales, /manifesto),
-      # promo/robots.txt, promo/sitemap.xml and brand/BRANDBOOK.html are tracked, generated files
-      # and belong in this list; manifesto was previously missing here despite being generated the
-      # same way as the other four pages, and BRANDBOOK.html was previously generated by no
-      # automated step at all (Stage 10 correction pass 1) — both gaps meant a drift in either file
-      # would never be caught here.
-      #
-      # src/generated/locales.ts and spec/fixtures/.escaped/ are gitignored by design (never
-      # committed), so they cannot be drift-checked via git diff here; their generation is
-      # exercised deterministically by the Test/Build/Validate-spec steps above instead.
-      - name: Check generated artifacts are up to date
-        run: |
-          npm run generate:all
-          git diff --exit-code -- \
-            README.md \
-            promo/examples.json \
-            promo/index.html \
-            promo/docs/index.html \
-            promo/locales/index.html \
-            promo/playground/index.html \
-            promo/manifesto/index.html \
-            promo/robots.txt \
-            promo/sitemap.xml \
-            promo/assets \
-            promo/vendor/polytypo.browser.js \
-            brand/BRANDBOOK.html

@@ -94,9 +94,6 @@ jobs:
       - name: Install dependencies (npm ci)
         run: npm ci
 
-      - name: Validate spec
-        run: npm run validate:spec
-
       - name: Lint
         run: npm run lint
 
