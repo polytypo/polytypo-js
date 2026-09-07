@@ -44,9 +44,11 @@ jobs:
     outputs:
       tarball-filename: ${{ steps.pack.outputs.filename }}
     steps:
-      # fetch-depth: 0 (full history, not the default shallow single-commit checkout) so the
-      # spec-tag verification step below can resolve refs/tags/spec-v* and dereference annotated
-      # tags to their target commit — a shallow checkout may not even have the tag object fetched.
+      # fetch-depth: 0 (full history, not the default shallow single-commit checkout). Neither
+      # verify-release-tag.mjs nor verify-spec-tag.mjs below needs it (the former only compares
+      # ref names and package.json; the latter resolves the canonical tag over the GitHub API, not
+      # local git) — kept for parity with canonical's own workflows and because a shallow clone
+      # buys nothing else here that a future release-gate addition couldn't need.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -80,15 +82,14 @@ jobs:
       # verified above (`v<package.json version>`) and the canonical spec tag
       # (`spec-v<spec/VERSION>`) are distinct identities that happen to share a numeric value
       # right now. For v1, an operator creates and pushes `spec-v1.0.0` manually, before pushing
-      # `v1.0.0` (only the latter triggers this workflow). This step proves both tags point at the
-      # exact same commit before anything is built or packed — it never creates, moves, fetches,
-      # or pushes a tag, only reads what the checkout above (fetch-depth: 0) already has.
-      # `github.sha` is the commit the pushed tag resolves to; passed through `env` and referenced
-      # as a quoted shell variable for the same injection-safety reason as RELEASE_TAG above.
-      - name: Verify canonical spec tag matches this release commit
-        env:
-          RELEASE_COMMIT: ${{ github.sha }}
-        run: node scripts/verify-spec-tag.mjs "${RELEASE_COMMIT}"
+      # `v1.0.0` (only the latter triggers this workflow). Post-split, the two tags live in
+      # historically unrelated repositories, so this step cannot and does not compare commit SHAs
+      # — see scripts/lib/spec-tag.mjs's header comment for why that would fail every legitimate
+      # release. It proves the operator's freeze step actually happened: that
+      # `spec-v<spec/VERSION>` exists on polytypo/polytypo. Never creates, moves, fetches, or
+      # pushes a tag, only reads what already exists there over the GitHub API.
+      - name: Verify the canonical spec tag exists
+        run: node scripts/verify-spec-tag.mjs
 
       # Clean, reproducible install from the committed lockfile — never `npm install` here.
       - name: Install dependencies (npm ci)

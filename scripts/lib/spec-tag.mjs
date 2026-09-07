@@ -7,23 +7,29 @@
 //
 // The two-tag v1 release contract this enforces (docs/AUDIT_REMEDIATION_AND_RELEASE_PLAN.md
 // section 8.4, docs/ROADMAP.md M5):
-//   1. An operator creates canonical spec tag `spec-v<spec/VERSION>` at the release commit and
+//   1. An operator creates canonical spec tag `spec-v<spec/VERSION>` on `polytypo/polytypo` and
 //      pushes it first — manually, for v1; this module never creates, moves, fetches, or pushes
 //      a tag, it only reads what already exists.
-//   2. The operator creates and pushes npm package tag `v<package.json version>` at the exact
-//      same commit — this is what actually triggers release.yml (scripts/lib/release-tag.mjs
-//      already gates on that tag; this module gates on the *other* one, independently).
-//   3. Before building or publishing anything, release.yml must prove both tags name the exact
-//      same commit. This module is that proof for the spec-tag half.
+//   2. The operator creates and pushes npm package tag `v<package.json version>` on this repo —
+//      this is what actually triggers release.yml (scripts/lib/release-tag.mjs already gates on
+//      that tag; this module gates on the *other* one, independently).
+//   3. Before building or publishing anything, release.yml must prove step 1 actually happened
+//      for the spec version this release vendors. This module is that proof.
 //
 // Post-split (docs/REPOSITORY_SPLIT_AND_SPEC_SYNC.md section 4.4): the two tags now live in two
-// different repositories — `spec-v*` in `polytypo/polytypo` (canonical), `v*` in
-// `polytypo/polytypo-js` (this repo, where this workflow runs). A local `git rev-parse` can no
-// longer resolve the canonical tag at all, so that half of the check goes over the GitHub REST
-// API instead — public and unauthenticated, since polytypo/polytypo is a public repository. Only
-// the release commit's own existence (a commit that must be in *this* checkout) is still resolved
-// locally.
-import { execFileSync } from "node:child_process";
+// different, historically unrelated repositories — `spec-v*` in `polytypo/polytypo` (canonical),
+// `v*` in `polytypo/polytypo-js` (this repo). Pre-split, both tags named the exact same commit
+// (one repository), so this module used to compare commit SHAs for equality. That comparison is
+// meaningless post-split: `git filter-repo` rewrote every tree, so no commit in this repo's
+// history is ever the same git object as a commit in canonical's history, by construction — the
+// check would fail on every legitimate release, not just a skipped freeze step. What the module
+// verifies instead, absent the full content-hash manifest (section 3, not yet implemented): the
+// canonical tag `spec-v<spec/VERSION>` exists in `canonicalRepo`. Since the tag name is derived
+// from this checkout's own vendored `spec/VERSION`, existence already proves an operator minted
+// that exact release tag on canonical before this one — the property this gate exists to enforce
+// is "the freeze step wasn't skipped," and existence-checking preserves that fail-closed
+// behaviour. Resolved over the GitHub REST API — public and unauthenticated, since
+// polytypo/polytypo is a public repository.
 
 /** Project policy (deliberately strict, matching how spec/VERSION has always been written:
  * "0.1.0" .. "1.0.0", never a pre-release or build-metadata suffix): exactly MAJOR.MINOR.PATCH,
@@ -58,21 +64,6 @@ export function parseStrictSpecVersion(raw) {
  * tag name that happens not to match spec/VERSION. */
 export function deriveSpecTagName(specVersion) {
   return `spec-v${specVersion}`;
-}
-
-function defaultRun(args, cwd) {
-  return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
-}
-
-/** Resolves an arbitrary commit-ish (expected to be a 40-character SHA from GITHUB_SHA in
- * practice, but not assumed to be well-formed) to a full commit SHA. Returns null (never throws)
- * on anything that doesn't resolve to a real commit in this checkout. */
-function resolveCommitish(commitish, cwd, run) {
-  try {
-    return run(["rev-parse", "--verify", "--quiet", `${commitish}^{commit}`], cwd);
-  } catch {
-    return null;
-  }
 }
 
 /** Resolves `tagName` in `ownerRepo` (e.g. "polytypo/polytypo") to the commit SHA it names, via
@@ -153,27 +144,20 @@ export async function resolveCanonicalTagCommit(tagName, ownerRepo, fetchImpl = 
 }
 
 /**
- * Verifies that the canonical spec tag derived from `specVersionRaw` exists in
- * `canonicalRepo` (read via the GitHub API, never a local git operation — the tag lives in a
- * different repository than this one) and resolves to the exact same commit as
- * `expectedCommitSha` (resolved locally, in the checkout at `cwd` — that commit belongs to this
- * repository). Never creates, moves, fetches, or pushes anything.
+ * Verifies that the canonical spec tag derived from `specVersionRaw` exists in `canonicalRepo`
+ * (read via the GitHub API, never a local git operation — the tag lives in a different,
+ * historically unrelated repository than this one). Existence is the whole check: see this
+ * module's header comment for why commit-SHA equality across the two repos is not a meaningful
+ * property to verify. Never creates, moves, fetches, or pushes anything.
  *
  * @param {object} opts
  * @param {string} opts.specVersionRaw - spec/VERSION's raw file contents.
- * @param {string} opts.expectedCommitSha - the release commit (GITHUB_SHA in the real workflow).
- * @param {string} [opts.cwd] - git working directory; defaults to process.cwd().
- * @param {(args: string[], cwd: string|undefined) => string} [opts.run] - injectable git
- *   invocation seam, for tests only; defaults to a real `execFileSync("git", args, {cwd})` call.
  * @param {(input: string|URL|Request, init?: object) => Promise<{ok: boolean, status: number, json: () => Promise<unknown>}>} [opts.fetchImpl] - injectable fetch seam, for tests only.
  * @param {string} [opts.canonicalRepo] - "owner/repo" holding the canonical spec tag.
  * @returns {Promise<{ok: true, tagName: string, commit: string} | {ok: false, reason: string}>}
  */
 export async function verifySpecTag({
   specVersionRaw,
-  expectedCommitSha,
-  cwd = process.cwd(),
-  run = defaultRun,
   fetchImpl = fetch,
   canonicalRepo = "polytypo/polytypo",
 }) {
@@ -182,31 +166,13 @@ export async function verifySpecTag({
 
   const tagName = deriveSpecTagName(parsed.version);
 
-  const expectedCommit = resolveCommitish(expectedCommitSha, cwd, run);
-  if (expectedCommit === null) {
-    return {
-      ok: false,
-      reason: `Expected release commit "${expectedCommitSha}" does not resolve to a real commit in this checkout.`,
-    };
-  }
-
   const tagResult = await resolveCanonicalTagCommit(tagName, canonicalRepo, fetchImpl);
   if (!tagResult.ok) {
     return {
       ok: false,
       reason:
-        `${tagResult.reason} It must be created and pushed by an operator to ${canonicalRepo}, ` +
-        `before the npm package tag, at the same commit as the release.`,
-    };
-  }
-
-  if (tagResult.commit !== expectedCommit) {
-    return {
-      ok: false,
-      reason:
-        `Canonical spec tag "${tagName}" (in ${canonicalRepo}) resolves to commit ${tagResult.commit}, ` +
-        `but the release commit is ${expectedCommit} — the spec tag and the npm package tag must ` +
-        `point at the exact same commit.`,
+        `${tagResult.reason} It must be created and pushed by an operator to ${canonicalRepo} ` +
+        `before the npm package tag.`,
     };
   }
 

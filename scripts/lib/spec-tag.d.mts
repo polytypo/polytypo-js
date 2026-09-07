@@ -18,9 +18,6 @@ export declare function resolveCanonicalTagCommit(
 
 export declare function verifySpecTag(opts: {
   specVersionRaw: string;
-  expectedCommitSha: string;
-  cwd?: string;
-  run?: (args: string[], cwd: string | undefined) => string;
   fetchImpl?: MinimalFetch;
   canonicalRepo?: string;
 }): Promise<{ ok: true; tagName: string; commit: string } | { ok: false; reason: string }>;

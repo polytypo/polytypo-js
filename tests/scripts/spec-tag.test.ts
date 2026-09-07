@@ -1,10 +1,11 @@
 // Exercises scripts/lib/spec-tag.mjs — the canonical spec-tag half of the two-tag release
 // contract (docs/ROADMAP.md M5, docs/REPOSITORY_SPLIT_AND_SPEC_SYNC.md section 4.4). Since the
-// split, the canonical `spec-v*` tag lives in a different repository (polytypo/polytypo) than
-// this one, so it is resolved over the GitHub API, not local git — these tests use an injected
-// `fetchImpl` stub, never a real network call. The release commit itself (`v*`, this repository's
-// own tag) is still resolved via a local `run` stub, exactly as before. A final describe block
-// asserts on the real .github/workflows/release.yml text.
+// split, the canonical `spec-v*` tag lives in a different, historically unrelated repository
+// (polytypo/polytypo) than this one, so it is resolved over the GitHub API — these tests use an
+// injected `fetchImpl` stub, never a real network call — and existence is the whole check (see
+// spec-tag.mjs's header comment for why commit-SHA equality across the two repos isn't a
+// meaningful property). A final describe block asserts on the real .github/workflows/release.yml
+// text.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -139,146 +140,67 @@ describe("scripts/lib/spec-tag.mjs — resolveCanonicalTagCommit() with an injec
   });
 });
 
-describe("scripts/lib/spec-tag.mjs — verifySpecTag() with injected run()/fetchImpl stubs (no git or network)", () => {
+describe("scripts/lib/spec-tag.mjs — verifySpecTag() with an injected fetchImpl stub (no network)", () => {
   const REF_URL = "https://api.github.com/repos/polytypo/polytypo/git/refs/tags/spec-v1.0.0";
-  const throwingRun = () => {
-    throw new Error("run() should not have been called");
-  };
   const throwingFetch = async () => {
     throw new Error("fetchImpl should not have been called");
   };
 
-  it("fails closed on a malformed spec/VERSION before ever calling run() or fetchImpl()", async () => {
+  it("fails closed on a malformed spec/VERSION before ever calling fetchImpl()", async () => {
     const result = await verifySpecTag({
       specVersionRaw: "not-a-version",
-      expectedCommitSha: "deadbeef",
-      run: throwingRun,
       fetchImpl: throwingFetch,
     });
     expect(result.ok).toBe(false);
-  });
-
-  it("fails closed when the expected commit does not resolve", async () => {
-    const result = await verifySpecTag({
-      specVersionRaw: "1.0.0",
-      expectedCommitSha: "not-a-real-sha",
-      run: () => {
-        throw new Error("git rev-parse: not a valid object name");
-      },
-      fetchImpl: throwingFetch,
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toContain("not-a-real-sha");
   });
 
   it("fails closed when the spec tag is missing in the canonical repo", async () => {
     const result = await verifySpecTag({
       specVersionRaw: "1.0.0",
-      expectedCommitSha: "abc123",
-      run: (args) => {
-        if (args.includes("abc123^{commit}")) return "abc123full";
-        throw new Error("unexpected args");
-      },
       fetchImpl: stubFetch({ [REF_URL]: { status: 404, body: {} } }),
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toContain("spec-v1.0.0");
   });
 
-  it("fails closed when the spec tag points at a different commit than the release", async () => {
+  it("succeeds when the canonical spec tag exists (lightweight tag)", async () => {
     const result = await verifySpecTag({
       specVersionRaw: "1.0.0",
-      expectedCommitSha: "release-sha",
-      run: (args) => {
-        if (args.includes("release-sha^{commit}")) return "commit-a";
-        throw new Error("unexpected args");
-      },
       fetchImpl: stubFetch({
-        [REF_URL]: { status: 200, body: { object: { type: "commit", sha: "commit-b" } } },
+        [REF_URL]: { status: 200, body: { object: { type: "commit", sha: "abc123" } } },
       }),
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason).toContain("commit-a");
-      expect(result.reason).toContain("commit-b");
-    }
+    expect(result).toEqual({ ok: true, tagName: "spec-v1.0.0", commit: "abc123" });
   });
 
-  it("succeeds when the canonical spec tag resolves to the exact release commit", async () => {
-    const result = await verifySpecTag({
-      specVersionRaw: "1.0.0",
-      expectedCommitSha: "release-sha",
-      run: (args) => {
-        if (args.includes("release-sha^{commit}")) return "same-commit";
-        throw new Error("unexpected args");
-      },
-      fetchImpl: stubFetch({
-        [REF_URL]: { status: 200, body: { object: { type: "commit", sha: "same-commit" } } },
-      }),
-    });
-    expect(result).toEqual({ ok: true, tagName: "spec-v1.0.0", commit: "same-commit" });
-  });
-
-  it("succeeds with a matching annotated tag, dereferenced to the release commit", async () => {
+  it("succeeds with an annotated tag, dereferenced to its target commit", async () => {
     const TAG_URL = "https://api.github.com/repos/polytypo/polytypo/git/tags/tagobjsha";
     const result = await verifySpecTag({
       specVersionRaw: "1.0.0",
-      expectedCommitSha: "release-sha",
-      run: (args) => {
-        if (args.includes("release-sha^{commit}")) return "same-commit";
-        throw new Error("unexpected args");
-      },
       fetchImpl: stubFetch({
         [REF_URL]: { status: 200, body: { object: { type: "tag", sha: "tagobjsha" } } },
-        [TAG_URL]: { status: 200, body: { object: { sha: "same-commit" } } },
+        [TAG_URL]: { status: 200, body: { object: { sha: "derefcommit" } } },
       }),
     });
-    expect(result).toEqual({ ok: true, tagName: "spec-v1.0.0", commit: "same-commit" });
+    expect(result).toEqual({ ok: true, tagName: "spec-v1.0.0", commit: "derefcommit" });
   });
 
-  it("fails on an invalid/nonexistent expected commit SHA even if the correct tag exists", async () => {
+  it("fails closed on an unreachable GitHub API", async () => {
     const result = await verifySpecTag({
       specVersionRaw: "1.0.0",
-      expectedCommitSha: "0000000000000000000000000000000000dead",
-      run: () => {
-        throw new Error("not a valid object name");
+      fetchImpl: async () => {
+        throw new Error("getaddrinfo ENOTFOUND api.github.com");
       },
-      fetchImpl: throwingFetch,
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toContain("does not resolve to a real commit");
-  });
-
-  it("never passes a hostile expected SHA through anything but a discrete argv element", async () => {
-    const hostile = "$(rm -rf /tmp/should-not-run); echo pwned; `id`";
-    let sawHostileAsWholeArg = false;
-    const result = await verifySpecTag({
-      specVersionRaw: "1.0.0",
-      expectedCommitSha: hostile,
-      run: (args) => {
-        // The pure logic must pass the hostile string as one argv element (never interpolated
-        // into a larger string), and this stub is a plain function call, not a shell — there is
-        // no way for the payload to execute here either way, but we additionally assert the
-        // argv-array contract holds.
-        if (args.includes(`${hostile}^{commit}`)) sawHostileAsWholeArg = true;
-        throw new Error("not a valid object name");
-      },
-      fetchImpl: throwingFetch,
-    });
-    expect(result.ok).toBe(false);
-    expect(sawHostileAsWholeArg).toBe(true);
+    if (!result.ok) expect(result.reason).toContain("Could not reach the GitHub API");
   });
 
   it("targets a caller-supplied canonicalRepo instead of the polytypo/polytypo default", async () => {
     const otherUrl = "https://api.github.com/repos/example/other/git/refs/tags/spec-v1.0.0";
     const result = await verifySpecTag({
       specVersionRaw: "1.0.0",
-      expectedCommitSha: "release-sha",
       canonicalRepo: "example/other",
-      run: (args) => {
-        if (args.includes("release-sha^{commit}")) return "same-commit";
-        throw new Error("unexpected args");
-      },
       fetchImpl: stubFetch({
         [otherUrl]: { status: 200, body: { object: { type: "commit", sha: "same-commit" } } },
       }),
