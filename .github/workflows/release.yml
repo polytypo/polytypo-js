@@ -256,6 +256,13 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
+      # Trusted publishing (OIDC) requires npm CLI 11.5.1+; the npm bundled with actions/setup-node's
+      # "22" alias has been observed as low as 10.x, well under that floor. This has no
+      # `--provenance`/`--access` equivalent workaround — an npm below the floor simply never
+      # attempts OIDC and fails authentication outright, so the upgrade is mandatory, not a nicety.
+      - name: Ensure npm supports OIDC trusted publishing (11.5.1+)
+        run: npm install -g npm@latest
+
       # "polytypo" is an unscoped package name, so ordinary `npm publish` would already default to
       # public access — but `--provenance` specifically refuses to infer that for a package with
       # no prior published version ("Can't generate provenance for new or private package, you
@@ -265,15 +272,18 @@ jobs:
       # source checkout in this job at all — nothing to repack from). Provenance also requires the
       # `id-token: write` permission granted above and either `--provenance` here or
       # `publishConfig.provenance: true` in package.json (both are set, deliberately redundant).
-      # NODE_AUTH_TOKEN is a GitHub Actions secret, scoped to only this one step (not the job or
-      # workflow); secrets are masked in logs automatically, and no step in this workflow echoes
-      # it. This workflow performs the publish only — it does not create or push the tag that
-      # triggers it, does not create a GitHub release, and does not push anything to this
-      # repository.
+      #
+      # No NODE_AUTH_TOKEN, and no npm token secret anywhere in this workflow: authentication is
+      # npm trusted publishing (OIDC) — npm CLI 11.5.1+ detects the GitHub Actions OIDC context
+      # from the `id-token: write` permission above and exchanges it for a short-lived publish
+      # credential itself, which only works because a trusted publisher (this exact repo and
+      # workflow file) is configured on the "polytypo" package on npmjs.com. That configuration is
+      # a one-time, human, npm-account action — this workflow cannot create it. This workflow
+      # performs the publish only — it does not create or push the tag that triggers it, does not
+      # create a GitHub release, and does not push anything to this repository.
       - name: Publish to npm with provenance
         env:
           TARBALL_FILENAME: ${{ needs.verify.outputs.tarball-filename }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           # "./" prefix is load-bearing: without it, a bare "release-artifact/<file>.tgz" is one
