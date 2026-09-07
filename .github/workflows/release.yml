@@ -274,6 +274,10 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          TARBALL="release-artifact/${TARBALL_FILENAME}"
+          # "./" prefix is load-bearing: without it, a bare "release-artifact/<file>.tgz" is one
+          # slash away from looking like npm's GitHub-shorthand package spec ("owner/repo"), and
+          # npm's arg parser tries `git ls-remote` against it instead of reading a local file —
+          # confirmed by reproducing this exact failure with `npm publish --dry-run` locally.
+          TARBALL="./release-artifact/${TARBALL_FILENAME}"
           echo "publishing exact verified artifact: ${TARBALL}"
           npm publish "${TARBALL}" --provenance
