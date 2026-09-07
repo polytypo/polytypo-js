@@ -256,11 +256,13 @@ jobs:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
-      # "polytypo" is an unscoped package name, so npm's default publish access is already
-      # public — there is no `--access restricted` option for an unscoped name, and passing
-      # `--access public` here would be inert, not a safeguard. `npm publish <tarball>` publishes
-      # that exact file rather than repacking from the working directory (there is no source
-      # checkout in this job at all — nothing to repack from). Provenance requires the
+      # "polytypo" is an unscoped package name, so ordinary `npm publish` would already default to
+      # public access — but `--provenance` specifically refuses to infer that for a package with
+      # no prior published version ("Can't generate provenance for new or private package, you
+      # must set `access` to public", hit on the real first-release run), so `--access public` is
+      # required here even though it would be inert without `--provenance`. `npm publish <tarball>`
+      # publishes that exact file rather than repacking from the working directory (there is no
+      # source checkout in this job at all — nothing to repack from). Provenance also requires the
       # `id-token: write` permission granted above and either `--provenance` here or
       # `publishConfig.provenance: true` in package.json (both are set, deliberately redundant).
       # NODE_AUTH_TOKEN is a GitHub Actions secret, scoped to only this one step (not the job or
@@ -280,4 +282,4 @@ jobs:
           # confirmed by reproducing this exact failure with `npm publish --dry-run` locally.
           TARBALL="./release-artifact/${TARBALL_FILENAME}"
           echo "publishing exact verified artifact: ${TARBALL}"
-          npm publish "${TARBALL}" --provenance
+          npm publish "${TARBALL}" --provenance --access public
