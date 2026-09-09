@@ -825,37 +825,47 @@ describe("quotes — DOCUMENTED LIMITATION (not portable conformance evidence): 
   });
 });
 
-describe("quotes — ambiguity veto: at least one inline space, not exactly one (spec 0.5.0 correction)", () => {
+describe("quotes — medial-n veto: at least one inline space, not exactly one (spec 1.1.0)", () => {
   // `spaces` (order 10) ordinarily collapses a doubled space before `quotes` (order 40) ever
-  // sees it, so a doubled space surviving to the ambiguity veto's own check only happens when
-  // `spaces` is disabled — an uncommon but fully supported configuration (`rules: { spaces:
-  // false }`), and the one that actually exercises this predicate's own multi-space behaviour
-  // rather than `spaces`' collapsing behaviour.
+  // sees it, so a doubled space surviving to the veto's own check only happens when `spaces` is
+  // disabled — an uncommon but fully supported configuration (`rules: { spaces: false }`), and
+  // the one that actually exercises this predicate's own multi-space behaviour rather than
+  // `spaces`' collapsing behaviour.
   const noSpacesCollapse = { rules: { spaces: false } } as const;
 
-  it("en-US (cited idiom): a doubled space still preserves the input unchanged, full pipeline", () => {
+  it("en-US (cited idiom): a doubled space still converts, full pipeline", () => {
     // The idiom matcher itself does not match doubled-space input (tests/rules/quote-ambiguity
-    // .test.ts), but the general ambiguity veto still does, so the observable result is the same
-    // "preserved" outcome as an uncited locale — not a fallback conversion, not a crash.
-    for (const input of ["rock  'n' roll", "rock 'n'  roll", "rock  'n'  roll"]) {
-      expect(transform(input, { locale: "en-US", ...noSpacesCollapse })).toBe(input);
+    // .test.ts), but the universal medial-n veto still does, so the observable result is the same
+    // conversion as single-spaced input — not a fallback quotation, not a crash.
+    for (const [input, expected] of [
+      ["rock  'n' roll", "rock  ’n’ roll"],
+      ["rock 'n'  roll", "rock ’n’  roll"],
+      ["rock  'n'  roll", "rock  ’n’  roll"],
+    ] as const) {
+      expect(transform(input, { locale: "en-US", ...noSpacesCollapse })).toBe(expected);
     }
   });
 
-  it("en-GB/fi/sv (no cited idiom): a doubled space still preserves the input unchanged, full pipeline", () => {
+  it("en-GB/fi/sv (no cited idiom): a doubled space converts identically, full pipeline", () => {
     for (const locale of ["en-GB", "fi", "sv"]) {
-      for (const input of ["rock  'n' roll", "rock 'n'  roll", "rock  'n'  roll"]) {
-        expect(transform(input, { locale, ...noSpacesCollapse })).toBe(input);
+      for (const [input, expected] of [
+        ["rock  'n' roll", "rock  ’n’ roll"],
+        ["rock 'n'  roll", "rock ’n’  roll"],
+        ["rock  'n'  roll", "rock  ’n’  roll"],
+      ] as const) {
+        expect(transform(input, { locale, ...noSpacesCollapse })).toBe(expected);
       }
     }
   });
 
-  it("2- and 3-letter ambiguous forms are also preserved with a doubled space, full pipeline", () => {
+  it("2- and 3-letter spans are NOT this veto's shape and pair as ordinary quotations", () => {
+    // spec 1.1.0's narrowing: 0.5.0 preserved these, which declined every short nested quotation
+    // in every locale. en-US's primary pair is the double quote, so a top-level span takes it.
     expect(transform("say  'no'  now", { locale: "en-US", ...noSpacesCollapse })).toBe(
-      "say  'no'  now",
+      "say  “no”  now",
     );
     expect(transform("say  'yes'  now", { locale: "en-US", ...noSpacesCollapse })).toBe(
-      "say  'yes'  now",
+      "say  “yes”  now",
     );
   });
 
@@ -867,10 +877,11 @@ describe("quotes — ambiguity veto: at least one inline space, not exactly one 
   });
 
   it("with default options (`spaces` enabled), a doubled space collapses first, then the ordinary single-space contract applies", () => {
-    // Not a special case of the ambiguity veto — `spaces` (order 10) runs before `quotes`
-    // (order 40) and collapses "rock  'n' roll" to "rock 'n' roll" first, so en-US's cited idiom
-    // still matches and converts, exactly as it does for genuinely single-spaced input.
+    // Not a special case of the veto — `spaces` (order 10) runs before `quotes` (order 40) and
+    // collapses "rock  'n' roll" to "rock 'n' roll" first. Since spec 1.1.0 both locales reach
+    // the same output, by different mechanisms: en-US through its cited idiom, en-GB through the
+    // universal medial-n veto.
     expect(transform("rock  'n' roll", { locale: "en-US" })).toBe("rock ’n’ roll");
-    expect(transform("rock  'n' roll", { locale: "en-GB" })).toBe("rock 'n' roll");
+    expect(transform("rock  'n' roll", { locale: "en-GB" })).toBe("rock ’n’ roll");
   });
 });
