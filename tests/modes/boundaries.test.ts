@@ -21,11 +21,10 @@ describe("the span model (modes.md 3.2)", () => {
   it("is not model A: an inner quotation nested across an element takes the secondary pair", () => {
     // Processed per span, `'hi'` would pair in isolation at depth 1 and take the *primary*
     // glyphs. It sits inside a converted outer quotation, so the answer is the secondary pair.
-    // "hi" (2 letters) is used elsewhere in this suite as a short quoted word; here it is
-    // replaced by "fine" (4 letters, past the general ambiguous-medial-span veto's 1-3 LETTER
-    // bound, quotes.md 3.2) specifically so this test keeps exercising nesting-across-an-element
-    // mechanics rather than the veto's own boundary — that boundary has its own dedicated
-    // coverage in tests/rules/quotes.test.ts.
+    // "hi" (2 letters) is used elsewhere in this suite as a short quoted word; "fine" was
+    // substituted here under spec 0.5.0, whose veto swallowed any 1-3 letter span. Spec 1.1.0's
+    // veto matches only a medial n, so neither word would reach it — the substitution is kept
+    // because the assertion below is written against it, not because the veto still requires it.
     expect(html("\"He said <em>'fine'</em> loudly\"", "en-US")).toBe(
       "“He said <em>‘fine’</em> loudly”",
     );

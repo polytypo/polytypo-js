@@ -253,23 +253,31 @@ describe("apostrophe — idempotency", () => {
   }
 });
 
-describe("apostrophe — ambiguity preserve-set: at least one inline space, not exactly one (spec 0.5.0 correction)", () => {
-  it("apostropheRule alone still skips both marks with a doubled space on either side", () => {
-    // Marks that `quotes` would have declined to pair (spec 0.5.0's general ambiguous-medial-
-    // span veto) must never be independently curled by this rule's own case ladder — see
-    // apostrophe.md §3.4. Exercised directly against apostropheRule.apply() so this proves the
-    // rule's own consumption of the shared preserve-set, not merely that `quotes` got there
-    // first in the full pipeline.
-    for (const input of ["rock  'n' roll", "rock 'n'  roll", "rock  'n'  roll"]) {
-      expect(run(input, "en-GB")).toBe(input);
+describe("apostrophe — the withdrawn preserve set (apostrophe.md §3.4, spec 1.1.0)", () => {
+  it("apostropheRule alone converts both marks — it skips no position and reads no locale data", () => {
+    // Spec 0.5.0 had this rule consult a shared preserve set so its case ladder would not curl
+    // marks `quotes` had declined to pair. That set is withdrawn: conversion is now the specified
+    // outcome for exactly those marks, and the ladder's own cases 4 and 3 produce it unaided.
+    // Exercised directly against apostropheRule.apply(), so this proves the rule's own behaviour
+    // rather than something `quotes` did first in the full pipeline.
+    for (const [input, expected] of [
+      ["rock 'n' roll", "rock ’n’ roll"],
+      ["rock  'n' roll", "rock  ’n’ roll"],
+      ["rock 'n'  roll", "rock ’n’  roll"],
+      ["rock  'n'  roll", "rock  ’n’  roll"],
+    ] as const) {
+      expect(run(input, "en-GB")).toBe(expected);
     }
   });
 
-  it("full pipeline: stable through a second run with doubled spaces, `spaces` disabled", () => {
+  it("full pipeline: converts, then holds as a fixed point with doubled spaces, `spaces` disabled", () => {
     const opts = { locale: "en-GB", rules: { spaces: false } } as const;
-    for (const input of ["rock  'n' roll", "say  'no'  now"]) {
+    for (const [input, expected] of [
+      ["rock  'n' roll", "rock  ’n’ roll"],
+      ["say  'no'  now", "say  ‘no’  now"],
+    ] as const) {
       const once = transform(input, opts);
-      expect(once).toBe(input);
+      expect(once).toBe(expected);
       expect(transform(once, opts)).toBe(once);
     }
   });

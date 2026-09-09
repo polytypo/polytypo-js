@@ -4,39 +4,30 @@ import { NONE } from "../engine/sentinels.js";
 import type { ElisionIdiom } from "../types.js";
 
 /**
- * Shared, runtime-independent structural predicate consumed identically by `quotes` (order 40)
- * and `apostrophe` (order 50) — spec 0.5.0, quotes.md 3.2a and apostrophe.md 3.4. One module, one
- * definition of "ambiguous medial single-quote span", so the two rules cannot drift into two
- * approximations of the same shape.
+ * The structural predicates `quotes` (order 40) reads to decline a pairing — quotes.md 3.2.
  *
- * The shape: a pair of straight ASCII single quotes (U+0027) enclosing 1-3 `LETTER` code points,
- * with at least one `INLINE-SPACE` code point immediately outside each mark — `rock 'n' roll`,
- * `rock  'n'  roll` (doubled spaces), `She chose 'A' today`, `They said 'no' yesterday`. Only the
- * single code point immediately adjacent to each mark is tested; a longer run of inline spaces
- * further out does not invalidate the match — narrowing this to "exactly one" would reintroduce
- * false-positive quotation conversion for doubled-space input, which is worse than the false
- * negative this predicate already accepts (spec 0.5.0 correction; see quotes.md 3.2's own note).
- * Without a matching `quotes.elisionIdioms`
- * entry, neither `quotes` nor `apostrophe` may touch either mark: `quotes` must not pair them as
- * an ordinary quotation, and `apostrophe`'s own structural case ladder (which would otherwise
- * independently read the left mark as a leading elision and the right one as a trailing
- * possessive/elision — apostrophe.md 3.3 cases 3 and 4 — and convert both to U+2019 without ever
- * knowing about the idiom mechanism) must not convert them either. Preserving the author's ASCII
- * marks is a deliberate bounded false negative, preferred over inventing a quotation mark or an
- * apostrophe (spec/AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 3.1: "False negatives are preferable to
- * text damage").
+ * Two mechanisms, both decline-only, both with the same outcome: the marks survive pass 2
+ * unmatched and `apostrophe` (order 50) converts each by its own case ladder (apostrophe.md 3.3
+ * cases 4 then 3), giving `rock ’n’ roll`.
  *
- * This predicate is **shape-only** and does not itself decide correctness — an exact
- * `elisionIdioms` match (the existing, narrower, locale-cited mechanism — quotes.md 3.2, spec
- * 0.4.0) still takes priority and is computed separately by {@link computeIdiomMatchedIndices};
- * this module's {@link computeAmbiguousShapeIndices} finds the full structural shape regardless
- * of any idiom, and the caller subtracts the idiom-matched positions to get the set that must be
- * preserved.
+ * {@link computeIdiomMatchedIndices} is the locale-cited mechanism (spec 0.4.0): an exact
+ * `left`/`elided`/`right` context match against `quotes.elisionIdioms`.
+ *
+ * {@link computeAmbiguousShapeIndices} is the universal medial-`n` veto (spec 1.1.0): a pair of
+ * `NARROW` marks enclosing exactly one code point, U+006E `n` or U+004E `N`, with at least one
+ * `INLINE-SPACE` code point immediately outside each mark. It needs no citation because the
+ * operator ruled the idiom international (quotes.md 3.2, 2026-09-09), and it vetoes a superset of
+ * what the cited en-US entry does.
+ *
+ * Only `quotes` consumes this module. Spec 0.5.0 had `apostrophe` consume it too, through a
+ * preserve set that stopped its case ladder from converting marks 0.5.0 wanted preserved;
+ * conversion is now the specified outcome, so that set is withdrawn (apostrophe.md 3.4) and
+ * `apostrophe` reads no locale data again.
  */
 
-const SQ = 0x27;
-const MIN_ENCLOSED = 1;
-const MAX_ENCLOSED = 3;
+/** quotes.md 3.2 — the one code point this veto's span may enclose, in either case. */
+const LOWER_N = 0x6e;
+const UPPER_N = 0x4e;
 
 /** quotes.md 3.1 NARROW — the quote-mark glyphs an elision idiom's marks may appear as across
  * pipeline passes (straight, or already curled by an earlier pass). Canonical definition, shared
@@ -160,32 +151,41 @@ export function computeIdiomMatchedIndices(
 }
 
 /**
- * The general ambiguous-medial-span shape, locale-independent: a pair of **straight ASCII**
- * single quotes (U+0027 only — an already-curly U+2019/U+2018 pair is out of this predicate's
- * scope by construction, see the module comment) enclosing 1-3 `LETTER` code points, with **at
- * least one** `INLINE-SPACE` code point immediately outside each mark — a longer run of inline
- * spaces (`rock  'n'  roll`) still matches, since only the single adjacent code point is tested.
- * Both mark positions are returned for every match. A superset of
- * {@link computeIdiomMatchedIndices}'s output whenever an idiom's `elided` field is itself 1-3
- * letters (true of every idiom shipped so far), but computed independently rather than assumed,
- * since a future idiom's `elided` field is not required to be that short.
+ * The universal medial-`n` elision shape, locale-independent (spec 1.1.0, quotes.md 3.2): a pair
+ * of `NARROW` marks enclosing exactly one code point, U+006E `n` or U+004E `N`, with **at least
+ * one** `INLINE-SPACE` code point immediately outside each mark. A longer run of inline spaces
+ * (`rock  'n'  roll`) still matches, since only the single adjacent code point is tested; the
+ * "exactly one" variant would let a doubled-space `rock 'n' roll` fall through to ordinary
+ * quote-pairing. Both mark positions are returned for every match.
+ *
+ * **`NARROW`, not `SQ`, and that is an idempotency obligation rather than a preference.** This
+ * veto's marks are converted to U+2019 by `apostrophe`, so a straight-ASCII-only predicate would
+ * not recognise its own output and pass 2 would pair `rock ’n’ roll` as an ordinary `NARROW`
+ * quotation on the next pipeline run — measured, with a straight-only predicate, as
+ * `rock «n» roll` in `ru` and `rock ”n” roll` in `fi`. Spec 0.5.0's predicate was straight-only,
+ * correctly for its own preserve-then-stop outcome; inverting the outcome forces the widening.
+ * `apostrophe` emits U+2019 only in place of U+0027, so a span already written with real marks is
+ * matched and then left exactly as the author typed it.
+ *
+ * A superset of {@link computeIdiomMatchedIndices}'s output for every idiom whose `elided` field
+ * is a single `n`, which is every idiom shipped so far, but computed independently rather than
+ * assumed — a future idiom's `elided` field is not required to be that short.
  */
 export function computeAmbiguousShapeIndices(cp: readonly number[]): ReadonlySet<number> {
   const ambiguous = new Set<number>();
   const n = cp.length;
 
   for (let i = 0; i < n; i += 1) {
-    if (at(cp, i) !== SQ) continue;
+    if (!NARROW.has(at(cp, i))) continue;
 
     const lLit = i > 0 ? at(cp, i - 1) : NONE;
     if (lLit === NONE || !INLINE_SPACE.has(lLit)) continue;
 
-    let k = 0;
-    while (k < MAX_ENCLOSED && isLetter(at(cp, i + 1 + k))) k += 1;
-    if (k < MIN_ENCLOSED) continue;
+    const enclosed = at(cp, i + 1);
+    if (enclosed !== LOWER_N && enclosed !== UPPER_N) continue;
 
-    const j = i + 1 + k;
-    if (at(cp, j) !== SQ) continue;
+    const j = i + 2;
+    if (!NARROW.has(at(cp, j))) continue;
 
     const rLit = j + 1 < n ? at(cp, j + 1) : NONE;
     if (rLit === NONE || !INLINE_SPACE.has(rLit)) continue;
@@ -195,25 +195,4 @@ export function computeAmbiguousShapeIndices(cp: readonly number[]): ReadonlySet
   }
 
   return ambiguous;
-}
-
-/**
- * The set of straight-ASCII-quote index positions that must be preserved byte-identically by
- * both `quotes` and `apostrophe`: ambiguous-shaped, but with no matching cited idiom. Computed
- * once and consumed by both rules — see the module comment.
- */
-export function computePreserveIndices(
-  cp: readonly number[],
-  idioms: readonly ElisionIdiom[],
-): ReadonlySet<number> {
-  const ambiguous = computeAmbiguousShapeIndices(cp);
-  if (ambiguous.size === 0) return ambiguous;
-  const idiomMatched = computeIdiomMatchedIndices(cp, idioms);
-  if (idiomMatched.size === 0) return ambiguous;
-
-  const preserve = new Set<number>();
-  for (const index of ambiguous) {
-    if (!idiomMatched.has(index)) preserve.add(index);
-  }
-  return preserve;
 }

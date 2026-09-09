@@ -1,15 +1,13 @@
 import { isLetter } from "../engine/unicode.js";
 import { LINE_MARKER, MARKER, NONE } from "../engine/sentinels.js";
 import type { Edit, Rule, RuleContext } from "../types.js";
-import { computePreserveIndices } from "./quote-ambiguity.js";
 
 // spec/rules/apostrophe.md 3.1. The apostrophe is U+2019 in every v1 locale and the case ladder
-// below is structural, not lexical — but as of spec 0.5.0 this rule does read one piece of
-// locale data, `quotes.elisionIdioms`, indirectly: `computePreserveIndices` (quote-ambiguity.js)
-// tells this rule which straight-ASCII U+0027 positions `quotes` (order 40) left alone because
-// they are an ambiguous medial span with no cited idiom (apostrophe.md 3.4). Those positions are
-// skipped by the case ladder entirely, so this rule's own structural cases 3/4 never
-// independently curl a mark `quotes` deliberately preserved.
+// below is structural, not lexical. As of spec 1.1.0 this rule reads no locale data at all and
+// skips no position: 0.5.0's preserve set (apostrophe.md 3.4) existed to stop the ladder from
+// converting the marks `quotes` (order 40) had vetoed, and conversion is now the specified
+// outcome for every position `quotes` vetoes — the ladder's own cases 4 and 3 are exactly what
+// turns `rock 'n' roll` into `rock ’n’ roll`, in every locale.
 const SQ = 0x27;
 const RIGHT_SINGLE = 0x2019;
 
@@ -133,11 +131,9 @@ export const apostropheRule: Rule = {
     const cp = ctx.cp;
     const n = cp.length;
     const edits: Edit[] = [];
-    const preserve = computePreserveIndices(cp, ctx.locale.quotes.elisionIdioms);
 
     for (let i = 0; i < n; i += 1) {
       if (at(cp, i) !== SQ) continue;
-      if (preserve.has(i)) continue;
       const left = i > 0 ? at(cp, i - 1) : NONE;
       const right = i + 1 < n ? at(cp, i + 1) : NONE;
       if (isApostrophe(left, right)) {

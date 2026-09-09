@@ -199,11 +199,11 @@ function collectCandidates(
 ): Candidate[] {
   const n = arr.length;
   const candidates: Candidate[] = [];
-  // spec 0.5.0: the veto set is the UNION of the cited-idiom match (unchanged since 0.4.0) and
-  // the general ambiguous-medial-span shape (quotes.md 3.2a) — `quotes` must decline pairing for
-  // both, so that `apostrophe`'s own case ladder never independently "fixes" a shape `quotes`
-  // left alone (the shared-predicate module's own doc comment explains why that would
-  // reintroduce the class of bug the listed-idiom design exists to prevent).
+  // spec 1.1.0: the veto set is the UNION of the cited-idiom match (unchanged since 0.4.0) and
+  // the universal medial-n shape (quotes.md 3.2). `quotes` declines pairing for both, and both
+  // have the same intent — that `apostrophe` (order 50) convert the surviving marks by its own
+  // case ladder. The union is computed rather than assumed: an idiom's `elided` field is not
+  // required to be the single `n` the universal veto matches.
   const idiomMatched = computeIdiomMatchedIndices(arr, elisionIdioms);
   const ambiguousShape = computeAmbiguousShapeIndices(arr);
   const elisionVetoed =
