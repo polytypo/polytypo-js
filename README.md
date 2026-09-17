@@ -35,7 +35,7 @@ npm install polytypo
 ## Usage
 
 ```ts
-import { transform } from "polytypo";
+import { transform } from "polytypo/text";
 
 transform(`She said, "it's fine" -- but I wasn't sure...`, { locale: "en-US" });
 // She said, “it’s fine”—but I wasn’t sure…
@@ -49,6 +49,16 @@ transform(`Sie sagte: "Alles gut" -- aber ich war mir nicht sicher...`, { locale
 // Sie sagte: „Alles gut“ – aber ich war mir nicht sicher…
 ```
 
+Import the entry for the mode you use. Each subpath entry defaults `mode` to itself and loads only
+the parsers that mode needs:
+
+| Entry               | Parsers it loads                                              |
+| ------------------- | ------------------------------------------------------------- |
+| `polytypo/text`     | none                                                          |
+| `polytypo/html`     | parse5                                                        |
+| `polytypo/markdown` | parse5, micromark and its GFM, frontmatter and MDX extensions |
+| `polytypo`          | all of the above                                              |
+
 HTML and Markdown are first-class modes, not an afterthought — tags, attributes and fenced code
 are left alone; only text content is touched:
 
@@ -59,10 +69,9 @@ transform(`<a title="test... wait">Wait... she said "go on."</a>`, { locale: "en
 // <a title="test... wait">Wait… she said “go on.”</a>
 ```
 
-Subpath entries (`polytypo/text`, `polytypo/html`, `polytypo/markdown`) exclude the parser
-dependencies the other modes don't need, and each defaults `mode` to itself. The aggregate
-`polytypo` entry defaults `mode` to `"text"`; `locale` has no default anywhere and must always be
-passed explicitly — there is no silent fallback to English.
+The aggregate `polytypo` entry defaults `mode` to `"text"` and is the one to use when the mode is
+chosen at runtime. `locale` has no default anywhere and must always be passed explicitly — there is
+no silent fallback to English.
 
 ## Licence
 
