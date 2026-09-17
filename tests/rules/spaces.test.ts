@@ -278,7 +278,7 @@ describe("spaces — must not touch (spec/rules/spaces.md 4)", () => {
 
   it("strips before a lone dot only — spec/rules/spaces.md 3.4", () => {
     expect(run("a .")).toBe("a.");
-    expect(run("a .b")).toBe("a.b");
+    expect(run("a . b")).toBe("a. b");
     expect(run("a ..")).toBe("a ..");
     expect(run("a ...")).toBe("a ...");
     expect(run("a ....b")).toBe("a ....b");
@@ -286,6 +286,14 @@ describe("spaces — must not touch (spec/rules/spaces.md 4)", () => {
     // Measured in the input array, so every dot here is lone and every space still strips.
     expect(run("Hello . . .")).toBe("Hello...");
     expect(run("a . . . . b")).toBe("a.... b");
+  });
+
+  it("keeps the space before a dot that starts a token — spec/rules/spaces.md 3.4, spec 1.2.0", () => {
+    expect(run("a .b")).toBe("a .b");
+    expect(run("Use .NET, .NET Core")).toBe("Use .NET, .NET Core");
+    expect(run("from .5 to .9")).toBe("from .5 to .9");
+    expect(run("a .é")).toBe("a .é");
+    expect(run("a .)")).toBe("a.)");
   });
 
   it("never strips before U+2026 — it is not in STRIP-BEFORE", () => {

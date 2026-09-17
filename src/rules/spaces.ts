@@ -114,13 +114,19 @@ function isEmptyBracketGuarded(left: number, right: number): boolean {
  * relative path, a truncation, a typed ellipsis — and deleting the space before it merges the
  * run with a preceding abbreviation dot (`See ../docs` → `See../docs`).
  *
+ * A single dot followed directly by a letter or an ASCII digit starts a token too (`.NET`,
+ * `.gitignore`, `.5` — spec 1.2.0's word-start clause), so the space before it is not deleted.
+ * A span boundary marker after the dot is neither, and the dot stays terminal.
+ *
  * `e` indexes `right` in the **input** array, and the run is measured there. Measuring it after
  * any edit had been applied would break the Chicago spaced ellipsis `Hello . . .`, where every
  * dot is a lone dot at decision time and all three spaces must still strip.
  */
 function isLoneDot(cp: readonly number[], e: number): boolean {
   if (at(cp, e) !== FULL_STOP) return true;
-  return !isDotlike(at(cp, e + 1));
+  const next = at(cp, e + 1);
+  if (isLetter(next) || isDigitAscii(next)) return false;
+  return !isDotlike(next);
 }
 
 function isDigitAscii(cp: number): boolean {

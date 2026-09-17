@@ -2,7 +2,7 @@ import { toCodePoints } from "../engine/codepoints.js";
 import { isLetter, isUpper, simpleUppercase } from "../engine/unicode.js";
 import { PolytypoError } from "../errors.js";
 import type { Edit, InitialBinding, LocaleData, Rule, RuleContext } from "../types.js";
-import { LINE_MARKER, NONE } from "../engine/sentinels.js";
+import { LINE_MARKER, MARKER, NONE } from "../engine/sentinels.js";
 
 /**
  * `nbsp` — spec/rules/nbsp.md (spec 0.1.0), order 70 (last).
@@ -208,13 +208,21 @@ export function prepare(locale: LocaleData): Prepared {
   };
 }
 
-/** 3.1 `OPENISH` / `CLOSEISH`: the ASCII brackets plus every locale quote glyph. */
+/**
+ * 3.1 `OPENISH` / `CLOSEISH`: the ASCII brackets plus every locale quote glyph.
+ *
+ * The inline span boundary `MARKER` is in `CLOSEISH` and not in `OPENISH` (spec 1.2.0, nbsp.md
+ * §7 item 12, modes.md 3.3). `CLOSEISH` is read only by N1/N2's right-context guard, where the
+ * marker lets the no-break space come back after `spaces` deleted the typed one in
+ * `<strong>gel :</strong>`. In `OPENISH` it would make the quote-glyph guard decline
+ * `<em>non</em> !`.
+ */
 export function isOpenish(prep: Prepared, cp: number): boolean {
   return contains(prep.opens, cp);
 }
 
 function isCloseish(prep: Prepared, cp: number): boolean {
-  return contains(prep.closes, cp);
+  return cp === MARKER || contains(prep.closes, cp);
 }
 
 function isMark(prep: Prepared, cp: number): boolean {

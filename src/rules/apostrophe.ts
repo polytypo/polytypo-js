@@ -91,6 +91,13 @@ const CLOSEISH: ReadonlySet<number> = new Set([
   0x2014,
 ]);
 
+// spec 1.2.0: the quotation glyphs of `OPENISH`, without its brackets and dashes, for case 3a.
+// Brackets stay out so a prime on a function name, `f'(x)`, is left alone. No `MARKER`: case 3
+// already accepts it through `CLOSEISH`.
+const OPENQUOTE: ReadonlySet<number> = new Set([
+  0xab, 0x2018, 0x201a, 0x201b, 0x201c, 0x201e, 0x201f, 0x2039,
+]);
+
 /** Out-of-range reads yield `NONE`, the spec's own boundary value. */
 function at(cp: readonly number[], i: number): number {
   const value = cp[i];
@@ -117,6 +124,9 @@ function isApostrophe(left: number, right: number): boolean {
   // 3 — trailing elision or possessive: `the dogs' bowls`, `Jesus'`.
   if (isLetter(left) && (right === NONE || SPACELIKE.has(right) || CLOSEISH.has(right)))
     return true;
+  // 3a — elision before a quotation (spec 1.2.0): `d'« urine »`, `l'“idea”`, and `„Hans'“`,
+  // whose de-DE closing glyph U+201C is not in `CLOSEISH`.
+  if (isLetter(left) && OPENQUOTE.has(right)) return true;
   // 4 — leading elision: `’90s`, `’tis`, `’em`. The replacement is U+2019, never U+2018 —
   // a leading elision is a raised comma, not an opening quotation mark, and `quotes` has
   // already had its chance to claim the mark as a quotation and declined (spec 3.2, 5).
