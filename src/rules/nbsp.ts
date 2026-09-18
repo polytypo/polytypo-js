@@ -28,6 +28,12 @@ const PAREN_CLOSE = 0x29;
 const SQUARE_CLOSE = 0x5d;
 const BRACE_CLOSE = 0x7d;
 
+const SEMICOLON = 0x3b;
+const AMPERSAND = 0x26;
+const HASH = 0x23;
+/** The longest HTML named reference is 31 code points (`CounterClockwiseContourIntegral`). */
+const MAX_CHARACTER_REFERENCE_NAME = 32;
+
 const EN_DASH = 0x2013;
 const EM_DASH = 0x2014;
 const ELLIPSIS = 0x2026;
@@ -330,7 +336,13 @@ function punctuationSubRule(
     // for ever on the French input `«?` (3.2, 3.10.1).
     if (isOpenish(prep, left)) continue;
     if (left !== NONE && isSpaceLike(left) && isOpenish(prep, at(cp, i - 2))) continue;
-    // Step 4.
+    // Step 4 (spec 1.3.0) — character-reference guard. In text mode there is no markup concept
+    // at all, so `fr`, whose narrowBeforePunctuation lists `;`, used to insert U+202F before the
+    // `;` that *ends* a reference: `Bonjour&#160;: oui` and `Tom &amp; Jerry` stopped being what
+    // they were. Shape, not the named-reference table: declining on `&notaname;` costs nothing,
+    // and five runtimes are not going to carry thousands of identical entries for it.
+    if (cp[i] === SEMICOLON && endsCharacterReference(cp, i)) continue;
+    // Step 5.
     if (left === target) continue;
     if (left === SPACE || left === other) {
       claimConversion(claims, i - 1, target);
@@ -341,6 +353,24 @@ function punctuationSubRule(
     if (left === NONE || isBreak(left) || left === TAB) continue;
     claimInsertion(claims, i, target);
   }
+}
+
+/**
+ * 3.3 step 4: do the code points left of this `;` have the shape of a character reference?
+ * A bounded left walk over ASCII alphanumerics, optionally one `#`, then `&`. The bound is the
+ * longest named reference (31) plus one, so the walk cannot run away down a long token.
+ */
+function endsCharacterReference(cp: readonly number[], i: number): boolean {
+  let j = i - 1;
+  while (j >= 0 && isAsciiAlphanumeric(cp[j] as number)) j -= 1;
+  const len = i - 1 - j;
+  if (len < 1 || len > MAX_CHARACTER_REFERENCE_NAME) return false;
+  if (j >= 0 && cp[j] === HASH) j -= 1;
+  return j >= 0 && cp[j] === AMPERSAND;
+}
+
+function isAsciiAlphanumeric(c: number): boolean {
+  return (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a);
 }
 
 /** N3 — 3.5 `afterShortWords`. */

@@ -658,3 +658,32 @@ describe("nbsp — exhaustive sweep, length 0…4", () => {
     });
   }
 });
+
+describe("N1/N2 character-reference guard (nbsp.md 3.3 step 4, spec 1.3.0)", () => {
+  const fr = (input: string): string => transform(input, { locale: "fr" });
+
+  // text mode has no markup concept, so before 1.3.0 `fr` inserted U+202F before the `;` that
+  // ends a reference and the reference stopped being one. Conformance:
+  // fr-nbsp-character-reference-numeric, -named, -not-a-reference, -ordinary-semicolon.
+  // The colon takes nothing either: step 1's run guard sees `;` to its left, and `;` is a mark
+  // in this locale. The reference already *is* the no-break space before the colon.
+  it("leaves a numeric character reference intact", () => {
+    expect(fr("Bonjour&#160;: oui")).toBe("Bonjour&#160;: oui");
+  });
+
+  it("leaves a named character reference intact", () => {
+    expect(fr("Tom &amp; Jerry")).toBe("Tom &amp; Jerry");
+  });
+
+  it("leaves a reference-shaped token intact even if the name is not a real entity", () => {
+    expect(fr("a &notaname; b")).toBe("a &notaname; b");
+  });
+
+  it("still binds an ordinary semicolon", () => {
+    expect(fr("Oui ; non")).toBe("Oui\u202f; non");
+  });
+
+  it("does not fire when the run is not preceded by an ampersand", () => {
+    expect(fr("Section 4; suite")).toBe("Section 4\u202f; suite");
+  });
+});
