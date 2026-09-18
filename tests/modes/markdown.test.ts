@@ -64,6 +64,37 @@ describe("markdown skip list (spec/rules/modes.md 3.7)", () => {
   it("keeps character escapes opaque", () => {
     expect(md("a\\*b...c\\*d\n")).toBe("a\\*b…c\\*d\n");
   });
+
+  // modes.md 3.7.3 names both delimiters. micromark's default matter is YAML alone, so TOML has
+  // to be asked for by name; without it a `+++` block is prose and its fields get typeset.
+  // Conformance: en-us-markdown-commonmark-frontmatter-toml.
+  it("skips a TOML frontmatter block whole, like the YAML one", () => {
+    const source = '+++\ntitle = "Une note"\n+++\n\nBody "quotes" here.\n';
+    expect(md(source)).toBe('+++\ntitle = "Une note"\n+++\n\nBody “quotes” here.\n');
+    expect(mdx(source)).toBe('+++\ntitle = "Une note"\n+++\n\nBody “quotes” here.\n');
+  });
+
+  it("skips a YAML frontmatter block whole, in both dialects", () => {
+    const source = '---\ntitle: "Une note"\n---\n\nBody "quotes" here.\n';
+    expect(md(source)).toBe('---\ntitle: "Une note"\n---\n\nBody “quotes” here.\n');
+    expect(mdx(source)).toBe('---\ntitle: "Une note"\n---\n\nBody “quotes” here.\n');
+  });
+
+  // The failure the skip exists to prevent, in the locale that shows it: fr would put U+00A0
+  // before the colon and U+202F before the semicolon of a machine-read field.
+  // Conformance: fr-markdown-commonmark-frontmatter-nbsp, fr-markdown-mdx-frontmatter-nbsp.
+  it("leaves a frontmatter field alone while fr nbsp is active in the body", () => {
+    const source = "---\ntitle: Une note ; suite\n---\n\nEst-ce vrai ?\n";
+    expect(md(source, "fr")).toBe("---\ntitle: Une note ; suite\n---\n\nEst-ce vrai\u202f?\n");
+  });
+
+  // An opening delimiter with no closing one is not a block: the `---` is a thematic break.
+  // Conformance: en-us-markdown-commonmark-frontmatter-unterminated.
+  it("does not skip after an unterminated opening delimiter", () => {
+    expect(md('---\ntitle: "Unclosed"\n\nBody "quotes" here.\n')).toBe(
+      "---\ntitle: “Unclosed”\n\nBody “quotes” here.\n",
+    );
+  });
 });
 
 describe("raw HTML inside markdown is handed to the html skip list (modes.md 3.7)", () => {

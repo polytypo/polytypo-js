@@ -37,9 +37,11 @@ const SKIPPED_TOKEN_TYPES: ReadonlySet<string> = new Set([
   "mdxFlowExpression",
   "mdxTextExpression",
   "mdxjsEsm",
-  // Not in modes.md 3.7, and it has to be: without it the second `---` of a YAML block reads as
-  // a setext underline, `title: Une note` becomes a paragraph, and `fr` puts a narrow no-break
-  // space in front of the colon of a machine-read metadata field. Reported as a spec gap.
+  // modes.md 3.7.3, and it matters: without it the second `---` of a YAML block reads as a setext
+  // underline, `title: Une note` becomes a paragraph, and `fr` puts a narrow no-break space in
+  // front of the colon of a machine-read metadata field. Covered by conformance fixtures
+  // en-us-markdown-{commonmark,mdx}-frontmatter, fr-markdown-{commonmark,mdx}-frontmatter-nbsp,
+  // en-us-markdown-commonmark-frontmatter-toml and -frontmatter-unterminated.
   "frontmatter",
 ]);
 
@@ -149,8 +151,14 @@ export function resolveDialect(dialect: Dialect | undefined): Dialect {
   );
 }
 
+// modes.md 3.7.3 names both frontmatter delimiters, `---` (YAML) and `+++` (TOML), and skips
+// either whole. micromark's default matter is YAML alone, so both must be asked for by name: with
+// the default, a `+++` block parses as prose and the machine-read fields inside it get typeset.
+const FRONTMATTER_MATTERS = ["yaml", "toml"] as const;
+
 function extensionsFor(dialect: Dialect): Extension[] {
-  return dialect === "mdx" ? [frontmatter(), gfm(), mdxjs()] : [frontmatter(), gfm()];
+  const fm = frontmatter([...FRONTMATTER_MATTERS]);
+  return dialect === "mdx" ? [fm, gfm(), mdxjs()] : [fm, gfm()];
 }
 
 export function markdownSpans(source: string, dialect: Dialect): Span[] {
