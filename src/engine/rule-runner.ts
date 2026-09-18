@@ -1,7 +1,8 @@
 import { PolytypoError } from "../errors.js";
 import { isRuleId, RULES, RULE_DEFAULTS, RULE_ORDER } from "../rules/registry.js";
-import type { LocaleData, Mode, Options, RuleId } from "../types.js";
+import type { Edit, LocaleData, Mode, Options, RuleId } from "../types.js";
 import { applyEdits } from "./edits.js";
+import { applyEditsToOrigin, recordChanges, type Change } from "./origin.js";
 
 /**
  * The rules that will run, in spec order. An explicit `false` always disables a rule and an
@@ -48,4 +49,36 @@ export function runRules(
     current = applyEdits(current, rule.apply({ cp: current, locale, mode }), id);
   }
   return current;
+}
+
+/**
+ * `runRules`, keeping the edits instead of discarding them (analyze.md §1: same pipeline, same
+ * order, reporting rather than applying). The origin map travels alongside the array so every
+ * change comes back in input coordinates, and `filterEdits` is the hook the span runner needs
+ * for modes.md §3.4's boundary filters — text mode passes nothing and gets the identity.
+ */
+export function runRulesRecording(
+  cp: readonly number[],
+  planned: readonly RuleId[],
+  locale: LocaleData,
+  mode: Mode,
+  origin: readonly number[],
+  inputLength: number,
+  filterEdits?: (current: readonly number[], edits: readonly Edit[]) => readonly Edit[],
+): Change[] {
+  let current = cp;
+  let currentOrigin = origin;
+  const changes: Change[] = [];
+  for (const id of planned) {
+    const rule = RULES[id];
+    if (rule === undefined) continue;
+    const produced = rule.apply({ cp: current, locale, mode });
+    const edits = filterEdits === undefined ? produced : filterEdits(current, produced);
+    if (edits.length > 0) {
+      changes.push(...recordChanges(current, edits, currentOrigin, inputLength, id));
+      currentOrigin = applyEditsToOrigin(currentOrigin, edits);
+    }
+    current = applyEdits(current, edits, id);
+  }
+  return changes;
 }

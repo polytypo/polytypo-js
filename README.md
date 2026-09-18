@@ -77,6 +77,24 @@ even four spaces is prose and a brace in it is a JSX expression: the same sample
 `POLYTYPO_MALFORMED_INPUT` instead. A fence or a code span is the one marker that means _code_ in
 both dialects.
 
+`analyze()` runs the same pipeline and reports what it would do instead of doing it — one record
+per edit, each with the rule that made it and code-point offsets into the input you passed (into
+the **document**, in `html` and `markdown` mode, not into a span):
+
+```ts
+import { analyze } from "polytypo";
+
+analyze(`Wait... "really"?`, { locale: "en-US" });
+// [ { ruleId: "ellipsis", start: 4, end: 7, before: "...", after: "…" },
+//   { ruleId: "quotes",   start: 8, end: 9, before: `"`,   after: "“" }, … ]
+```
+
+It is a report, not a patch. The list is empty exactly when `transform` would return the input
+unchanged, and every `ruleId` is a rule that was enabled for that call — but two rules may touch
+the same original range (French `spaces` deletes the space before `:` and `nbsp` puts a no-break
+one back), so replaying the list is not guaranteed to reproduce the output. Call `transform` for
+the text. Full contract: `spec/rules/analyze.md`.
+
 The aggregate `polytypo` entry defaults `mode` to `"text"` and is the one to use when the mode is
 chosen at runtime. `locale` has no default anywhere and must always be passed explicitly — there is
 no silent fallback to English.

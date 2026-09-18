@@ -1,7 +1,8 @@
 import type { Options } from "../types.js";
 import { fromCodePoints, toCodePoints } from "./codepoints.js";
+import type { Change } from "./origin.js";
 import { getLocaleData } from "./locale.js";
-import { planRules, runRules } from "./rule-runner.js";
+import { planRules, runRules, runRulesRecording } from "./rule-runner.js";
 
 /**
  * `text` mode only. Deliberately imports nothing from `../modes/html.js` or
@@ -18,4 +19,13 @@ export function runTextPipeline(input: string, options: Partial<Options>): strin
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
   return fromCodePoints(runRules(toCodePoints(input), planned, locale, "text"));
+}
+
+/** analyze.md §1: the same pipeline as `runTextPipeline`, reporting instead of applying. */
+export function analyzeTextPipeline(input: string, options: Partial<Options>): Change[] {
+  const planned = planRules(options.rules);
+  const locale = getLocaleData(options.locale);
+  const cp = toCodePoints(input);
+  const origin = cp.map((_value, index) => index);
+  return runRulesRecording(cp, planned, locale, "text", origin, cp.length);
 }

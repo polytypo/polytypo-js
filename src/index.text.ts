@@ -1,5 +1,6 @@
 import { assertFixedMode } from "./engine/assert-fixed-mode.js";
-import { runTextPipeline } from "./engine/text-pipeline.js";
+import { analyzeTextPipeline, runTextPipeline } from "./engine/text-pipeline.js";
+import type { Change } from "./engine/origin.js";
 import type { Options } from "./types.js";
 
 /**
@@ -20,6 +21,17 @@ export function transform(input: string, options: TextOptions): string {
   return runTextPipeline(input, given);
 }
 
+/**
+ * The same pipeline as this entry's `transform`, reporting instead of applying
+ * (spec/rules/analyze.md). Offsets are code-point offsets into `input`.
+ */
+export function analyze(input: string, options: TextOptions): Change[] {
+  const given = (options ?? {}) as Partial<Options>;
+  assertFixedMode(given.mode, "text", "polytypo/text");
+  return analyzeTextPipeline(input, given);
+}
+
 export { PolytypoError } from "./errors.js";
 export type { PolytypoErrorCode } from "./errors.js";
+export type { Change } from "./engine/origin.js";
 export type { LocaleData, LocaleSource, QuotePair, Rule, RuleContext, RuleId } from "./types.js";

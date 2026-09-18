@@ -2,6 +2,7 @@ import {
   concatenateSpans,
   filterBoundaryEdits,
   normalizeSpans,
+  originOfSpans,
   spanRangesOf,
   splitOnMarker,
   type Span,
@@ -9,7 +10,9 @@ import {
 import { RULES } from "../rules/registry.js";
 import type { LocaleData, Mode, RuleId } from "../types.js";
 import { applyEdits } from "./edits.js";
-import { fromCodePoints } from "./codepoints.js";
+import { fromCodePoints, toCodePoints } from "./codepoints.js";
+import type { Change } from "./origin.js";
+import { runRulesRecording } from "./rule-runner.js";
 
 /**
  * The same sequence as `runRules` (`./rule-runner.js`), with the two boundary filters of
@@ -72,4 +75,29 @@ export function runOverSpans(
     cursor = span.end;
   }
   return out + source.slice(cursor);
+}
+
+/**
+ * `runOverSpans`, reporting instead of applying (analyze.md §1). The span table supplies the
+ * origin map, so every change comes back in DOCUMENT coordinates — analyze.md §6 names a
+ * runtime that reports span-local offsets here as the mistake that passes every text-mode test.
+ */
+export function analyzeOverSpans(
+  source: string,
+  spans: readonly Span[],
+  planned: readonly RuleId[],
+  locale: LocaleData,
+  mode: Mode,
+): Change[] {
+  const normalized = normalizeSpans(spans);
+  if (normalized.length === 0) return [];
+  return runRulesRecording(
+    concatenateSpans(source, normalized),
+    planned,
+    locale,
+    mode,
+    originOfSpans(source, normalized),
+    toCodePoints(source).length,
+    (current, edits) => filterBoundaryEdits(current, edits, spanRangesOf(current)),
+  );
 }
