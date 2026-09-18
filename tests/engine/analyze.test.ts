@@ -140,6 +140,20 @@ describe("analyze (analyze.md)", () => {
       expect(change?.after).toBe("…");
     });
 
+    // Three spans, a non-ASCII character before the change, and the change in the third span:
+    // the two markers are the only code points in the joined array with no origin, and `café`
+    // puts the UTF-8 byte offset one ahead of the code-point one. A doubled or dropped marker
+    // origin, or a byte offset leaking out of a span adapter, moves this number.
+    it("reports document offsets in a later span, past a non-ASCII character", () => {
+      const input = `<p>café</p><p>two</p><p>Wait... three</p>`;
+      const [change] = analyze(input, { locale: "en-US", mode: "html" });
+      expect(change?.ruleId).toBe("ellipsis");
+      expect(change?.start).toBe(toCodePoints(input.slice(0, input.indexOf("..."))).length);
+      expect(Buffer.byteLength(input.slice(0, input.indexOf("...")), "utf8")).toBe(
+        (change?.start as number) + 1,
+      );
+    });
+
     it("reports document offsets in markdown mode too", () => {
       const input = `# Title\n\nWait... here\n`;
       const [change] = analyze(input, { locale: "en-US", mode: "markdown", dialect: "commonmark" });
