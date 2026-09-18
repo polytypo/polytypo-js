@@ -1,5 +1,6 @@
 import { assertFixedMode } from "./engine/assert-fixed-mode.js";
-import { runMarkdownPipeline } from "./engine/markdown-pipeline.js";
+import { analyzeMarkdownPipeline, runMarkdownPipeline } from "./engine/markdown-pipeline.js";
+import type { Change } from "./engine/origin.js";
 import type { Dialect, Options } from "./types.js";
 
 /**
@@ -20,6 +21,17 @@ export function transform(input: string, options: MarkdownOptions): string {
   const given = (options ?? {}) as Partial<Options>;
   assertFixedMode(given.mode, "markdown", "polytypo/markdown");
   return runMarkdownPipeline(input, given);
+}
+
+/**
+ * The same pipeline as this entry's `transform`, reporting instead of applying
+ * (spec/rules/analyze.md). Offsets are code-point offsets into `input` — into the document,
+ * not into a span (analyze.md §6).
+ */
+export function analyze(input: string, options: MarkdownOptions): Change[] {
+  const given = (options ?? {}) as Partial<Options>;
+  assertFixedMode(given.mode, "markdown", "polytypo/markdown");
+  return analyzeMarkdownPipeline(input, given);
 }
 
 export { PolytypoError } from "./errors.js";

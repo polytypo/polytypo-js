@@ -2,6 +2,7 @@ import { toCodePoints } from "../engine/codepoints.js";
 import { isMarker, LINE_MARKER, MARKER } from "../engine/sentinels.js";
 import { PolytypoError } from "../errors.js";
 import type { Edit } from "../types.js";
+import { NO_ORIGIN } from "../engine/origin.js";
 
 /**
  * The boundary markers are defined in the engine (src/engine/sentinels.ts), which is where all
@@ -183,4 +184,36 @@ export function splitOnMarker(cp: readonly number[], expected: number): number[]
     );
   }
   return pieces;
+}
+
+/**
+ * The origin map for `concatenateSpans` (analyze.md §2): for every code point of the joined
+ * array, the code-point offset of the character it came from IN THE DOCUMENT, and NO_ORIGIN for
+ * the markers, which came from nowhere. `Span` bounds are native string indices, so the
+ * conversion to code-point offsets happens here and not in the caller — this is the one place
+ * that knows both coordinate systems.
+ */
+export function originOfSpans(source: string, spans: readonly Span[]): number[] {
+  const codePointIndexOf = new Array<number>(source.length + 1);
+  let cpIndex = 0;
+  for (let i = 0; i < source.length;) {
+    codePointIndexOf[i] = cpIndex;
+    const code = source.codePointAt(i) as number;
+    const width = code > 0xffff ? 2 : 1;
+    if (width === 2) codePointIndexOf[i + 1] = cpIndex;
+    i += width;
+    cpIndex += 1;
+  }
+  codePointIndexOf[source.length] = cpIndex;
+
+  const origin: number[] = [];
+  let previous: Span | undefined;
+  for (const span of spans) {
+    if (previous !== undefined) origin.push(NO_ORIGIN);
+    const base = codePointIndexOf[span.start] as number;
+    const length = toCodePoints(source.slice(span.start, span.end)).length;
+    for (let k = 0; k < length; k += 1) origin.push(base + k);
+    previous = span;
+  }
+  return origin;
 }

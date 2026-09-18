@@ -2,7 +2,8 @@ import { htmlSpans } from "../modes/html.js";
 import type { Options } from "../types.js";
 import { getLocaleData } from "./locale.js";
 import { planRules } from "./rule-runner.js";
-import { runOverSpans } from "./span-runner.js";
+import { analyzeOverSpans, runOverSpans } from "./span-runner.js";
+import type { Change } from "./origin.js";
 
 /**
  * `html` mode only. Imports `parse5` (via `../modes/html.js`) and nothing from
@@ -18,4 +19,11 @@ export function runHtmlPipeline(input: string, options: Partial<Options>): strin
   const locale = getLocaleData(options.locale);
   const spans = htmlSpans(input);
   return runOverSpans(input, spans, planned, locale, "html");
+}
+
+/** analyze.md §1, `html` mode: offsets are into the document, not into a span (analyze.md §6). */
+export function analyzeHtmlPipeline(input: string, options: Partial<Options>): Change[] {
+  const planned = planRules(options.rules);
+  const locale = getLocaleData(options.locale);
+  return analyzeOverSpans(input, htmlSpans(input), planned, locale, "html");
 }

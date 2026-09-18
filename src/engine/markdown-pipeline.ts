@@ -2,7 +2,8 @@ import { markdownSpans, resolveDialect } from "../modes/markdown.js";
 import type { Options } from "../types.js";
 import { getLocaleData } from "./locale.js";
 import { planRules } from "./rule-runner.js";
-import { runOverSpans } from "./span-runner.js";
+import { analyzeOverSpans, runOverSpans } from "./span-runner.js";
+import type { Change } from "./origin.js";
 
 /**
  * `markdown` mode only. Imports the Micromark/MDX stack and `parse5` (via `../modes/markdown.js`
@@ -20,4 +21,14 @@ export function runMarkdownPipeline(input: string, options: Partial<Options>): s
   const dialect = resolveDialect(options.dialect);
   const spans = markdownSpans(input, dialect);
   return runOverSpans(input, spans, planned, locale, "markdown");
+}
+
+/** analyze.md §1, `markdown` mode. Dialect validation happens here exactly as it does for
+ * `runMarkdownPipeline`, so an absent dialect throws POLYTYPO_INVALID_DIALECT from `analyze`
+ * too (analyze.md §4 A1). */
+export function analyzeMarkdownPipeline(input: string, options: Partial<Options>): Change[] {
+  const planned = planRules(options.rules);
+  const locale = getLocaleData(options.locale);
+  const dialect = resolveDialect(options.dialect);
+  return analyzeOverSpans(input, markdownSpans(input, dialect), planned, locale, "markdown");
 }

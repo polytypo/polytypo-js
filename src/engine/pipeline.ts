@@ -1,8 +1,9 @@
 import { PolytypoError } from "../errors.js";
 import type { Mode, Options } from "../types.js";
-import { runHtmlPipeline } from "./html-pipeline.js";
-import { runMarkdownPipeline } from "./markdown-pipeline.js";
-import { runTextPipeline } from "./text-pipeline.js";
+import { analyzeHtmlPipeline, runHtmlPipeline } from "./html-pipeline.js";
+import { analyzeMarkdownPipeline, runMarkdownPipeline } from "./markdown-pipeline.js";
+import { analyzeTextPipeline, runTextPipeline } from "./text-pipeline.js";
+import type { Change } from "./origin.js";
 
 export { planRules } from "./rule-runner.js";
 
@@ -31,4 +32,17 @@ export function runPipeline(input: string, options: Options): string {
   if (mode === "text") return runTextPipeline(input, given);
   if (mode === "html") return runHtmlPipeline(input, given);
   return runMarkdownPipeline(input, given);
+}
+
+/**
+ * The dispatcher for `analyze` (analyze.md §1). Mode resolution, and therefore
+ * POLYTYPO_INVALID_MODE, is shared with `runPipeline` rather than duplicated: A1 requires the
+ * two entry points to accept and reject exactly the same arguments.
+ */
+export function runAnalyze(input: string, options: Options): Change[] {
+  const given: Partial<Options> = options ?? {};
+  const mode = resolveMode(given.mode);
+  if (mode === "text") return analyzeTextPipeline(input, given);
+  if (mode === "html") return analyzeHtmlPipeline(input, given);
+  return analyzeMarkdownPipeline(input, given);
 }
