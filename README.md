@@ -69,6 +69,14 @@ transform(`<a title="test... wait">Wait... she said "go on."</a>`, { locale: "en
 // <a title="test... wait">Wait… she said “go on.”</a>
 ```
 
+In `markdown` mode the skipped regions are the dialect's own structural ones, not whatever looks
+like code. CommonMark counts an indented block as code at **four** spaces; at two it is an ordinary
+paragraph, so a JSON sample indented by two comes back with curly quotes — valid JSON in, invalid
+JSON out, and nothing in the return value says so. MDX has no indented code blocks at all, so there
+even four spaces is prose and a brace in it is a JSX expression: the same sample throws
+`POLYTYPO_MALFORMED_INPUT` instead. A fence or a code span is the one marker that means _code_ in
+both dialects.
+
 The aggregate `polytypo` entry defaults `mode` to `"text"` and is the one to use when the mode is
 chosen at runtime. `locale` has no default anywhere and must always be passed explicitly — there is
 no silent fallback to English.
