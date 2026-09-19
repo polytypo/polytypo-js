@@ -317,3 +317,164 @@ describe("ranges — order: ranges runs before dashes (registry.ts §note, range
     }
   });
 });
+
+describe("ranges — closed-up symbols on both members (ranges.md §3.2a, spec 1.3.0)", () => {
+  it("admits a repeated currency prefix", () => {
+    expect(run("$15-$20", enUS)).toBe(`$15${WJ}${EN}${WJ}$20`);
+    expect(run("€15-€20", deDE)).toBe(`€15${WJ}${EN}${WJ}€20`);
+  });
+
+  it("admits a repeated suffix — the mirror case, walking the left flank", () => {
+    expect(run("35%-50%", enUS)).toBe(`35%${WJ}${EN}${WJ}50%`);
+    expect(run("35%-50%", ru)).toBe(`35%${WJ}${EM}${WJ}50%`);
+    expect(run("15°-20°", enUS)).toBe(`15°${WJ}${EN}${WJ}20°`);
+  });
+
+  it("requires the same code point on both members", () => {
+    // A currency conversion, not a range. Declining it is the point: the symbols differ.
+    expect(run("$15-€20", enUS)).toBe("$15-€20");
+    expect(run("15-$20", enUS)).toBe("15-$20");
+    expect(run("15%-20", enUS)).toBe("15%-20");
+  });
+
+  it("leaves the elided forms exactly as they were before §3.2a", () => {
+    expect(run("$15-20", enUS)).toBe(`$15${WJ}${EN}${WJ}20`);
+    expect(run("15-20%", enUS)).toBe(`15${WJ}${EN}${WJ}20%`);
+  });
+
+  it("consumes at most one code point per side", () => {
+    // `US$` is three; G1 also declines it, since `before` reads past the matched $ and finds S.
+    expect(run("US$15-US$20", enUS)).toBe("US$15-US$20");
+    expect(run("15°C-20°C", enUS)).toBe("15°C-20°C");
+  });
+
+  it("still applies G1-G5 over the digit runs, which the symbols do not change", () => {
+    expect(run("$8859-$1", enUS)).toBe("$8859-$1"); // G4 (4,1)
+    expect(run("$20-$10", enUS)).toBe("$20-$10"); // G5 decreasing
+    expect(run("$15-$20-$25", enUS)).toBe("$15-$20-$25"); // G2 chain
+  });
+
+  it("emits nothing in a locale whose range form is none", () => {
+    expect(run("$15-$20", fr)).toBe("$15-$20");
+  });
+
+  it("is idempotent, including the re-entry across its own joiners", () => {
+    for (const input of ["$15-$20", "35%-50%", "$15 - $20", `$15${WJ}${EN}${WJ}$20`]) {
+      const once = run(input, enUS);
+      expect(run(once, enUS)).toBe(once);
+    }
+  });
+
+  it("takes the spaced token away from dashes — ranges.md §3.2a's accepted cost", () => {
+    // Through spec 1.2.0 `dashes` converted this with DEFAULT options, because the right flank
+    // was a symbol and not a digit. It is a range candidate now, so `dashes` declines it
+    // unconditionally and nothing touches it unless the caller enables `ranges`.
+    const cp = toCodePoints("$15 - $20");
+    expect(dashesRule.apply({ cp, locale: enUS, mode: "text" })).toEqual([]);
+    expect(transform("$15 - $20", { locale: "en-US" })).toBe("$15 - $20");
+    expect(transform("$15 - $20", { locale: "en-US", rules: { ranges: true } })).toBe(
+      `$15${WJ}${EN}${WJ}$20`,
+    );
+  });
+
+  it("leaves an unmatched pair with dashes, which still converts it by default", () => {
+    // The other half of the cost: only a *matched* symbol moves a token between rules.
+    expect(transform("$15 - €20", { locale: "en-US" })).toBe("$15—€20");
+  });
+});
+
+describe("closed-up symbols and T1 (dashes.md §3.2 step 8, spec 1.3.0)", () => {
+  // Widening what counts as a range member widens what a `dashes` edit elsewhere can disturb.
+  // Each of these produced a transform idempotency defect before T1 was amended:
+  // pass 1 let `dashes` convert its own token, that edit replaced the range's `before`/`after`
+  // with a U+0020, and the range converted on pass 2. All three are inert in the all-digit
+  // shape, which is what the guards are supposed to guarantee.
+  const witnesses = ["a—$15-$20", "35%-50%—b", "a--15% - 20%", "$1 - $1--a"];
+
+  for (const locale of ["de-DE", "ru", "en-GB", "fi"] as const) {
+    it(`is a fixed point on every witness in ${locale}`, () => {
+      for (const input of witnesses) {
+        const once = transform(input, { locale, rules: { ranges: true } });
+        expect(transform(once, { locale, rules: { ranges: true } })).toBe(once);
+      }
+    });
+  }
+
+  it("composes both transparency positions on one side", () => {
+    // p1 (between the token and the run) and p2 (at the far end of the run) at once. The
+    // exhaustive sweep could not reach this shape — it needs about eleven tokens.
+    for (const locale of ["de-DE", "ru"] as const) {
+      for (const input of ["a--$15% - $20%", "$15% - $20%--a", "a--$15% - $20%--b"]) {
+        const once = transform(input, { locale, rules: { ranges: true } });
+        expect(transform(once, { locale, rules: { ranges: true } })).toBe(once);
+      }
+    }
+  });
+
+  it("leaves a tight-parenthetical locale untouched — the boundary of the cost", () => {
+    // T1 only applies when the chosen form is spaced, which is why the repair is T1 and not the
+    // cluster guard: that one is unconditional and would have taken en-US with it.
+    expect(transform("price--$50--drop", { locale: "en-US" })).toBe("price—$50—drop");
+    expect(transform("Anstieg--50%--war", { locale: "de-DE" })).toBe("Anstieg--50%--war");
+    expect(transform("Anstieg--50--war", { locale: "de-DE" })).toBe("Anstieg--50--war");
+  });
+
+  it("makes the symbol shape behave exactly like its all-digit analogue", () => {
+    const opts = { locale: "de-DE", rules: { ranges: true } } as const;
+    expect(transform("a—15-20", opts)).toBe("a—15-20");
+    expect(transform("a—$15-$20", opts)).toBe("a—$15-$20");
+    expect(transform("a--1 - 1", opts)).toBe("a--1 - 1");
+    expect(transform("a--$1 - $1", opts)).toBe("a--$1 - $1");
+  });
+
+  it("converts a hyphen an author typed between an existing joiner pair", () => {
+    // The only input that separates dashes.md §3.2a's amended re-entry condition from the
+    // unamended one: with a symbol on the flank the old condition fell through to
+    // "joiner crossed in any other configuration: emit nothing".
+    expect(transform(`$15${WJ}-${WJ}$20`, { locale: "en-US", rules: { ranges: true } })).toBe(
+      `$15${WJ}${EN}${WJ}$20`,
+    );
+  });
+
+  it("decides both flanks from the original indices, simultaneously", () => {
+    // Both flanks in CLOSED-SYMBOL is the shape that makes evaluation order observable: a
+    // left-then-right or right-then-left reading leaves one side's digit run undefined.
+    expect(run("%15%-%20%", enUS)).toBe(`%15%${WJ}${EN}${WJ}%20%`);
+  });
+
+  it("admits a block member no other test names, and refuses a currency sign outside the set", () => {
+    // CLOSED-SYMBOL is the whole U+20A0-U+20CF block by its bounds, so a port that enumerates
+    // only the symbols it saw in tests fails the first line; U+058F and U+FFE5 are currency
+    // signs in Unicode's own classification and deliberately outside the set, so a port using an
+    // Sc category test — the implementation ranges.md §3.2a forbids — fails the second.
+    expect(run("₹15-₹20", enUS)).toBe(`₹15${WJ}${EN}${WJ}₹20`);
+    expect(run("₴100-₴200", enUS)).toBe(`₴100${WJ}${EN}${WJ}₴200`);
+    expect(run("֏15-֏20", enUS)).toBe("֏15-֏20");
+    expect(run("￥15-￥20", enUS)).toBe("￥15-￥20");
+  });
+
+  it("reads effective neighbours in T1's right branch, symbol or no symbol", () => {
+    // dashes.md §3.2 step 8 disagreed with §3.2b in its own text through spec 1.2.0; the
+    // implementation never did. The space ends the cluster, so step 7 does not cover this.
+    expect(transform("a--15⁠ - 20", { locale: "de-DE", rules: { ranges: true } })).toBe(
+      "a--15⁠ - 20",
+    );
+  });
+
+  it("pins every member of CLOSED-SYMBOL, since it is an enumeration and not a category", () => {
+    const pairs: Array<[string, string]> = [
+      ["¢", "¢"],
+      ["£", "£"],
+      ["¤", "¤"],
+      ["¥", "¥"],
+      ["€", "€"],
+      ["$", "$"],
+    ];
+    for (const [symbol] of pairs) {
+      expect(run(`${symbol}15-${symbol}20`, enUS)).toBe(`${symbol}15${WJ}${EN}${WJ}${symbol}20`);
+    }
+    for (const suffix of ["%", "‰", "‱", "°"]) {
+      expect(run(`15${suffix}-20${suffix}`, enUS)).toBe(`15${suffix}${WJ}${EN}${WJ}20${suffix}`);
+    }
+  });
+});

@@ -6,12 +6,12 @@ import {
   MINUS_SIGN,
   EN_DASH,
   buildReplacement,
-  isDigit,
   isOpenBracket,
   isSpaced,
   isSpacingTransitionBlocked,
   isStripBeforeOrCloseBracket,
   findDashTokens,
+  rangeFlanks,
   sameContent,
   type DashStyle,
 } from "./dash-shared.js";
@@ -23,12 +23,14 @@ import {
  * machinery via `dash-shared.js`. See dashes.md 1 and 7.11, and ranges.md 1, for why the split
  * happened and why range detection is opt-in rather than fixed structurally.
  *
- * A digit-flanked dash token is declined here **unconditionally** — never reinterpreted as a
+ * A range candidate is declined here **unconditionally** — never reinterpreted as a
  * parenthetical dash — regardless of whether `ranges` is enabled (operator decision, spec
  * 0.5.0). That was already true of every prior spec version: the range/parenthetical branches
- * have always been mutually exclusive per token, on the same `isDigit(leftCp) && isDigit(rightCp)`
- * test that now decides which rule a token belongs to rather than which branch of one rule it
- * takes.
+ * have always been mutually exclusive per token, on the same test that now decides which rule a
+ * token belongs to rather than which branch of one rule it takes. Spec 1.3.0 widened that test
+ * from "both flanks DIGIT" to `rangeFlanks` (ranges.md 3.2a), so a token whose members repeat a
+ * closed-up symbol — `$15 - $20` — moved from this rule to `ranges`, and therefore from
+ * converting by default to converting only when the caller enables `ranges`.
  *
  * Explicit index-based scanning only: no regex anywhere, and every index addresses the
  * code-point array, never a native string (ARCHITECTURE.md 4.1, 4.2).
@@ -81,9 +83,11 @@ function scan(ctx: RuleContext): Edit[] {
   for (const token of findDashTokens(cp)) {
     const { s, e, leftCp, rightCp, left, right, lsp, rsp } = token;
 
-    // A digit-flanked token is `ranges`' territory, never `dashes`' — declined unconditionally,
-    // whether or not `ranges` is enabled (operator decision, spec 0.5.0).
-    if (isDigit(leftCp) && isDigit(rightCp)) continue;
+    // A range candidate is `ranges`' territory, never `dashes`' — declined unconditionally,
+    // whether or not `ranges` is enabled (operator decision, spec 0.5.0). Since spec 1.3.0 a
+    // candidate may carry a matched closed-up symbol on a flank (ranges.md 3.2a), which is why
+    // this is `rangeFlanks` rather than a digit test on both flanks.
+    if (rangeFlanks(cp, left, right) !== undefined) continue;
 
     // dashes.md 3.4 P5 — authored en-dash mark-identity veto (spec 0.6.0). A run consisting of
     // exactly one U+2013 is declined unconditionally: every locale, tight or spaced, regardless
