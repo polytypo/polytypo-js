@@ -21,7 +21,14 @@ function optionsFor(locale: string, testCase: ConformanceCase): Options {
     testCase.dialect === undefined
       ? { locale, mode: testCase.mode }
       : { locale, mode: testCase.mode, dialect: testCase.dialect };
-  return testCase.rules === undefined ? base : { ...base, rules: testCase.rules };
+  const withRules = testCase.rules === undefined ? base : { ...base, rules: testCase.rules };
+  // The SAME object is used for the transform and for the idempotency re-run below. That is
+  // contract as of spec 1.3.0, not convenience: a case carrying `narrowNbsp` is a fixed point
+  // under its own options and not under the defaults, so a runner that re-ran with defaults
+  // would go red on a correct implementation (ARCHITECTURE.md §6.1).
+  return testCase.narrowNbsp === undefined
+    ? withRules
+    : { ...withRules, narrowNbsp: testCase.narrowNbsp };
 }
 
 function assertThrowsCode(label: string, code: string, run: () => string): void {
