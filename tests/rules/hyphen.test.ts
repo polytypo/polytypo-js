@@ -19,7 +19,7 @@ function localeOf(tag: string): LocaleData {
 /** The rule is exercised directly, so these expectations do not depend on the pipeline. */
 function run(input: string, locale: LocaleData): string {
   const cp = toCodePoints(input);
-  const edits = hyphenRule.apply({ cp, locale, mode: "text" });
+  const edits = hyphenRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "hyphen"));
 }
 
@@ -96,7 +96,7 @@ describe("hyphen — worked examples, spec §6", () => {
     for (const locale of emptyLocales) {
       expect(run(input, locale)).toBe(input);
       const cp = toCodePoints(input);
-      expect(hyphenRule.apply({ cp, locale, mode: "text" })).toEqual([]);
+      expect(hyphenRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f })).toEqual([]);
     }
   });
 });
@@ -141,9 +141,11 @@ describe("hyphen — locale data validation (spec §2)", () => {
   it("raises POLYTYPO_MALFORMED_LOCALE_DATA for an entry with no U+002D", () => {
     const broken = withHyphen(ru, { compounds: ["изпод"], prefixes: [], suffixes: [] });
     const cp = toCodePoints("изпод");
-    expect(() => hyphenRule.apply({ cp, locale: broken, mode: "text" })).toThrow(PolytypoError);
+    expect(() =>
+      hyphenRule.apply({ cp, locale: broken, mode: "text", narrowTarget: 0x202f }),
+    ).toThrow(PolytypoError);
     try {
-      hyphenRule.apply({ cp, locale: broken, mode: "text" });
+      hyphenRule.apply({ cp, locale: broken, mode: "text", narrowTarget: 0x202f });
     } catch (error) {
       expect((error as PolytypoError).code).toBe("POLYTYPO_MALFORMED_LOCALE_DATA");
     }

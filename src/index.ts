@@ -29,6 +29,7 @@ export type {
   LocaleData,
   LocaleSource,
   Mode,
+  NarrowNbsp,
   Options,
   QuotePair,
   Rule,

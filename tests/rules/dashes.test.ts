@@ -29,7 +29,7 @@ function withDash(base: LocaleData, dash: LocaleData["dash"]): LocaleData {
  */
 function run(input: string, locale: LocaleData): string {
   const cp = toCodePoints(input);
-  const edits = dashesRule.apply({ cp, locale, mode: "text" });
+  const edits = dashesRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "dashes"));
 }
 
@@ -684,7 +684,7 @@ describe("dashes — no-break spaces", () => {
       const locale = localeOf(tag);
       for (const input of ["mot - autre", "mot--autre", `mot${EM}autre`, `a ${EN} b`]) {
         const cp = toCodePoints(input);
-        for (const edit of dashesRule.apply({ cp, locale, mode: "text" })) {
+        for (const edit of dashesRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f })) {
           for (const value of edit.replacement) emitted.add(value);
         }
       }

@@ -20,7 +20,7 @@ function localeOf(tag: string): LocaleData {
 /** The rule is exercised directly, so these expectations do not depend on the pipeline. */
 function run(input: string, locale: LocaleData): string {
   const cp = toCodePoints(input);
-  const edits = nbspRule.apply({ cp, locale, mode: "text" });
+  const edits = nbspRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "nbsp"));
 }
 
@@ -274,7 +274,7 @@ describe("nbsp — conflict policy and sub-rule ordering (spec §3.2)", () => {
   it("edits are ascending, non-overlapping and never touch an index twice", () => {
     const input = "и т. д. в Москве А. С. Пушкин, 5 км, № 7";
     const cp = toCodePoints(input);
-    const edits = nbspRule.apply({ cp, locale: ru, mode: "text" });
+    const edits = nbspRule.apply({ cp, locale: ru, mode: "text", narrowTarget: 0x202f });
     let previousEnd = 0;
     for (const edit of edits) {
       expect(edit.start).toBeGreaterThanOrEqual(previousEnd);
@@ -290,9 +290,11 @@ describe("nbsp — conflict policy and sub-rule ordering (spec §3.2)", () => {
   it("N1 wins over N2 is unreachable: the two lists must be disjoint", () => {
     const clash = withNbsp(fr, { beforePunctuation: ["!"], narrowBeforePunctuation: ["!"] });
     const cp = toCodePoints("Bonjour!");
-    expect(() => nbspRule.apply({ cp, locale: clash, mode: "text" })).toThrow(PolytypoError);
+    expect(() => nbspRule.apply({ cp, locale: clash, mode: "text", narrowTarget: 0x202f })).toThrow(
+      PolytypoError,
+    );
     try {
-      nbspRule.apply({ cp, locale: clash, mode: "text" });
+      nbspRule.apply({ cp, locale: clash, mode: "text", narrowTarget: 0x202f });
     } catch (error) {
       expect((error as PolytypoError).code).toBe("POLYTYPO_MALFORMED_LOCALE_DATA");
     }
@@ -382,7 +384,7 @@ describe("nbsp — round trip", () => {
     for (const tag of ["en-GB", "sv"]) {
       const locale = localeOf(tag);
       const cp = toCodePoints(input);
-      const edits = nbspRule.apply({ cp, locale, mode: "text" });
+      const edits = nbspRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
       expect(edits).toEqual([]);
     }
   });

@@ -11,7 +11,7 @@ import { quotesRule } from "../../src/rules/quotes";
 function run(input: string, tag: string): string {
   const locale = getLocaleData(tag);
   const cp = toCodePoints(input);
-  const edits = quotesRule.apply({ cp, locale, mode: "text" });
+  const edits = quotesRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "quotes"));
 }
 
@@ -24,7 +24,11 @@ function run(input: string, tag: string): string {
 function runSpans(template: string, tag: string): string {
   const locale = getLocaleData(tag);
   const cp = toCodePoints(template).map((c) => (c === 0x27e6 ? MARKER : c));
-  const out = applyEdits(cp, quotesRule.apply({ cp, locale, mode: "html" }), "quotes");
+  const out = applyEdits(
+    cp,
+    quotesRule.apply({ cp, locale, mode: "html", narrowTarget: 0x202f }),
+    "quotes",
+  );
   return fromCodePoints(out.map((c) => (c === MARKER ? 0x27e6 : c)));
 }
 

@@ -10,7 +10,7 @@ import { apostropheRule } from "../../src/rules/apostrophe";
 function run(input: string, tag = "en-US"): string {
   const locale = getLocaleData(tag);
   const cp = toCodePoints(input);
-  const edits = apostropheRule.apply({ cp, locale, mode: "text" });
+  const edits = apostropheRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "apostrophe"));
 }
 
