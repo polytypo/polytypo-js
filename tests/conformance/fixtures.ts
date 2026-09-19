@@ -34,6 +34,8 @@ export interface ConformanceCase {
   readonly throws?: PolytypoErrorCode | undefined;
   readonly note?: string | undefined;
   readonly rules?: Options["rules"];
+  /** spec 1.3.0, nbsp.md §3.1a. Passed straight through, on BOTH calls — see the runner. */
+  readonly narrowNbsp?: Options["narrowNbsp"];
 }
 
 export interface ConformanceFile {
@@ -77,6 +79,14 @@ function optionalString(value: unknown, where: string): string | undefined {
 
 function requireArray(value: unknown, where: string): readonly unknown[] {
   if (!Array.isArray(value)) throw new Error(`${where}: expected an array`);
+  return value;
+}
+
+function parseNarrowNbsp(value: unknown, where: string): Options["narrowNbsp"] {
+  if (value === undefined) return undefined;
+  if (value !== "narrow" && value !== "nbsp") {
+    throw new Error(`${where}: "narrowNbsp" must be "narrow" or "nbsp"`);
+  }
   return value;
 }
 
@@ -131,6 +141,7 @@ function parseCase(raw: unknown, where: string): ConformanceCase {
     throws: throws as PolytypoErrorCode | undefined,
     note: optionalString(raw.note, `${where} "note"`),
     rules: parseRuleOverrides(raw.rules, where),
+    narrowNbsp: parseNarrowNbsp(raw.narrowNbsp, where),
   };
 }
 
