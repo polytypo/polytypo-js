@@ -25,12 +25,13 @@ function runRulesOverSpans(
   planned: readonly RuleId[],
   locale: LocaleData,
   mode: Mode,
+  narrowTarget: number,
 ): readonly number[] {
   let current = cp;
   for (const id of planned) {
     const rule = RULES[id];
     if (rule === undefined) continue;
-    const edits = rule.apply({ cp: current, locale, mode });
+    const edits = rule.apply({ cp: current, locale, mode, narrowTarget });
     current = applyEdits(current, filterBoundaryEdits(current, edits, spanRangesOf(current)), id);
   }
   return current;
@@ -52,6 +53,7 @@ export function runOverSpans(
   planned: readonly RuleId[],
   locale: LocaleData,
   mode: Mode,
+  narrowTarget: number,
 ): string {
   const normalized = normalizeSpans(spans);
   if (normalized.length === 0) return source;
@@ -61,6 +63,7 @@ export function runOverSpans(
     planned,
     locale,
     mode,
+    narrowTarget,
   );
   const pieces = splitOnMarker(transformed, normalized.length);
 
@@ -88,6 +91,7 @@ export function analyzeOverSpans(
   planned: readonly RuleId[],
   locale: LocaleData,
   mode: Mode,
+  narrowTarget: number,
 ): Change[] {
   const normalized = normalizeSpans(spans);
   if (normalized.length === 0) return [];
@@ -96,6 +100,7 @@ export function analyzeOverSpans(
     planned,
     locale,
     mode,
+    narrowTarget,
     originOfSpans(source, normalized),
     toCodePoints(source).length,
     (current, edits) => filterBoundaryEdits(current, edits, spanRangesOf(current)),

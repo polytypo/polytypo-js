@@ -20,7 +20,7 @@ function localeOf(tag: string): LocaleData {
 /** The rule is exercised directly rather than through `transform`, mirroring dashes.test.ts. */
 function run(input: string, locale: LocaleData): string {
   const cp = toCodePoints(input);
-  const edits = rangesRule.apply({ cp, locale, mode: "text" });
+  const edits = rangesRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "ranges"));
 }
 
@@ -87,7 +87,7 @@ describe("ranges — safe default: bare numeric forms and compound labels are al
       const locale = localeOf(tag);
       for (const input of ["5-10", "Figure 5-10", "7-11", "9-11"]) {
         const cp = toCodePoints(input);
-        expect(dashesRule.apply({ cp, locale, mode: "text" })).toEqual([]);
+        expect(dashesRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f })).toEqual([]);
       }
     }
   });
@@ -291,7 +291,9 @@ describe("ranges — cluster guard, spec/rules/dashes.md §3.2 step 7", () => {
     for (const input of ["a-5-10", "known-5-10-b", "2026-08-15"]) {
       expect(run(input, enUS)).toBe(input);
       const cp = toCodePoints(input);
-      expect(dashesRule.apply({ cp, locale: enUS, mode: "text" })).toEqual([]);
+      expect(dashesRule.apply({ cp, locale: enUS, mode: "text", narrowTarget: 0x202f })).toEqual(
+        [],
+      );
     }
   });
 });
@@ -370,7 +372,7 @@ describe("ranges — closed-up symbols on both members (ranges.md §3.2a, spec 1
     // was a symbol and not a digit. It is a range candidate now, so `dashes` declines it
     // unconditionally and nothing touches it unless the caller enables `ranges`.
     const cp = toCodePoints("$15 - $20");
-    expect(dashesRule.apply({ cp, locale: enUS, mode: "text" })).toEqual([]);
+    expect(dashesRule.apply({ cp, locale: enUS, mode: "text", narrowTarget: 0x202f })).toEqual([]);
     expect(transform("$15 - $20", { locale: "en-US" })).toBe("$15 - $20");
     expect(transform("$15 - $20", { locale: "en-US", rules: { ranges: true } })).toBe(
       `$15${WJ}${EN}${WJ}$20`,

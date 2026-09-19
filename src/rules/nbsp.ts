@@ -123,6 +123,8 @@ export interface Prepared {
   readonly opens: readonly number[];
   readonly closes: readonly number[];
   readonly quotePairs: readonly QuoteTarget[];
+  /** nbsp.md §3.1a NARROW-TARGET: what N2 writes, and what N8 writes for a `narrow-nbsp` pair. */
+  readonly narrowTarget: number;
 }
 
 function malformed(message: string): never {
@@ -152,7 +154,13 @@ function prepareList(entries: readonly string[]): (readonly number[])[] {
   return out;
 }
 
-export function prepare(locale: LocaleData): Prepared {
+/**
+ * nbsp.md §3.1a: `narrowTarget` is NARROW-TARGET, already resolved by the caller — U+202F by
+ * default, U+00A0 when `narrowNbsp: "nbsp"`. It is threaded into `prepare` so N2's and N8's
+ * targets move together; nothing else in this rule changes, and §5's idempotency argument carries
+ * over because every sub-rule's "already correct" branch recognises its own target.
+ */
+export function prepare(locale: LocaleData, narrowTarget: number = NNBSP): Prepared {
   const data = locale.nbsp;
   const beforePunctuation = data.beforePunctuation.map((entry) =>
     singleCodePoint(entry, "beforePunctuation"),
@@ -195,7 +203,7 @@ export function prepare(locale: LocaleData): Prepared {
     // 3.10 sidedness precondition: an open glyph equal to its close glyph cannot be told
     // apart without the pairing information only `quotes` has. Documented no-op (§7.5).
     if (open === close) continue;
-    quotePairs.push({ open, close, target: pair.innerSpace === "nbsp" ? NBSP : NNBSP });
+    quotePairs.push({ open, close, target: pair.innerSpace === "nbsp" ? NBSP : narrowTarget });
   }
 
   return {
@@ -211,6 +219,7 @@ export function prepare(locale: LocaleData): Prepared {
     opens,
     closes,
     quotePairs,
+    narrowTarget,
   };
 }
 
@@ -606,7 +615,7 @@ function forwardBindingSubRule(
 }
 
 function scan(ctx: RuleContext): Edit[] {
-  const prep = prepare(ctx.locale);
+  const prep = prepare(ctx.locale, ctx.narrowTarget);
   const cp = ctx.cp;
   const claims: Claims = new Array<Edit | undefined>(cp.length + 1);
 
@@ -620,7 +629,17 @@ function scan(ctx: RuleContext): Edit[] {
   // — kept disjoint by the §2 precondition, which fails loudly — and N1/N2 against N8, which
   // is what the quote-glyph guard above repairs.
   punctuationSubRule(cp, prep, claims, prep.beforePunctuation, NBSP, NNBSP);
-  punctuationSubRule(cp, prep, claims, prep.narrowBeforePunctuation, NNBSP, NBSP);
+  // N2's target is NARROW-TARGET (§3.1a); `other` is the NOBREAK member that is not the target,
+  // which is what the sub-rule converts. With the substitution on, N2 and N1 want the same
+  // character — never different ones, which is why §5's clause 0 needs no new case.
+  punctuationSubRule(
+    cp,
+    prep,
+    claims,
+    prep.narrowBeforePunctuation,
+    prep.narrowTarget,
+    prep.narrowTarget === NBSP ? NNBSP : NBSP,
+  );
   shortWordsSubRule(cp, prep, claims);
   abbreviationsSubRule(cp, prep, claims);
   unitsSubRule(cp, prep, claims);

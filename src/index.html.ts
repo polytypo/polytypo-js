@@ -34,4 +34,5 @@ export function analyze(input: string, options: HtmlOptions): Change[] {
 export { PolytypoError } from "./errors.js";
 export type { PolytypoErrorCode } from "./errors.js";
 export type { Change } from "./engine/origin.js";
+export type { NarrowNbsp } from "./types.js";
 export type { LocaleData, LocaleSource, QuotePair, Rule, RuleContext, RuleId } from "./types.js";

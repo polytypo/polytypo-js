@@ -32,7 +32,16 @@ export interface Options {
    * key always means "use that rule's own default", never "off".
    */
   rules?: Partial<Record<RuleId, boolean>>;
+  /**
+   * `"nbsp"` makes the engine emit U+00A0 everywhere it would emit U+202F — the narrow no-break
+   * space many common faces do not carry (nbsp.md §3.1a). Default `"narrow"`. This moves the
+   * rule's target rather than post-processing the output, so the result stays a fixed point.
+   */
+  narrowNbsp?: NarrowNbsp;
 }
+
+/** nbsp.md §3.1a. `"narrow"` (the default) emits U+202F; `"nbsp"` emits U+00A0 in its place. */
+export type NarrowNbsp = "narrow" | "nbsp";
 
 /** Mirrors spec/schema/locale.schema.json. Literal data only — no patterns, no priorities. */
 export interface QuotePair {
@@ -131,6 +140,12 @@ export interface RuleContext {
   readonly cp: readonly number[];
   readonly locale: LocaleData;
   readonly mode: Mode;
+  /**
+   * nbsp.md §3.1a's NARROW-TARGET, already resolved to a code point: U+202F by default, U+00A0
+   * when the caller passed `narrowNbsp: "nbsp"`. A rule reads a code point and never the option,
+   * so the string never reaches the pipeline.
+   */
+  readonly narrowTarget: number;
 }
 
 export interface Rule {

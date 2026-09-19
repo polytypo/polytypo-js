@@ -9,7 +9,7 @@ const locale = getLocaleData("en-GB");
 
 function run(input: string): string {
   const cp = toCodePoints(input);
-  const edits = symbolsRule.apply({ cp, locale, mode: "text" });
+  const edits = symbolsRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "symbols"));
 }
 

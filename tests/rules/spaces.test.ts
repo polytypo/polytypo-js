@@ -10,7 +10,7 @@ const locale = getLocaleData("en-GB");
 
 function run(input: string): string {
   const cp = toCodePoints(input);
-  const edits = spacesRule.apply({ cp, locale, mode: "text" });
+  const edits = spacesRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
   return fromCodePoints(applyEdits(cp, edits, "spaces"));
 }
 

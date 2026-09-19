@@ -41,12 +41,13 @@ export function runRules(
   planned: readonly RuleId[],
   locale: LocaleData,
   mode: Mode,
+  narrowTarget: number,
 ): readonly number[] {
   let current = cp;
   for (const id of planned) {
     const rule = RULES[id];
     if (rule === undefined) continue;
-    current = applyEdits(current, rule.apply({ cp: current, locale, mode }), id);
+    current = applyEdits(current, rule.apply({ cp: current, locale, mode, narrowTarget }), id);
   }
   return current;
 }
@@ -62,6 +63,7 @@ export function runRulesRecording(
   planned: readonly RuleId[],
   locale: LocaleData,
   mode: Mode,
+  narrowTarget: number,
   origin: readonly number[],
   inputLength: number,
   filterEdits?: (current: readonly number[], edits: readonly Edit[]) => readonly Edit[],
@@ -72,7 +74,7 @@ export function runRulesRecording(
   for (const id of planned) {
     const rule = RULES[id];
     if (rule === undefined) continue;
-    const produced = rule.apply({ cp: current, locale, mode });
+    const produced = rule.apply({ cp: current, locale, mode, narrowTarget });
     const edits = filterEdits === undefined ? produced : filterEdits(current, produced);
     if (edits.length > 0) {
       changes.push(...recordChanges(current, edits, currentOrigin, inputLength, id));

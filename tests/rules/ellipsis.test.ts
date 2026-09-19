@@ -9,7 +9,7 @@ function runIn(tag: string): (input: string) => string {
   const locale = getLocaleData(tag);
   return (input: string): string => {
     const cp = toCodePoints(input);
-    const edits = ellipsisRule.apply({ cp, locale, mode: "text" });
+    const edits = ellipsisRule.apply({ cp, locale, mode: "text", narrowTarget: 0x202f });
     return fromCodePoints(applyEdits(cp, edits, "ellipsis"));
   };
 }

@@ -5,7 +5,8 @@ export type PolytypoErrorCode =
   | "POLYTYPO_UNKNOWN_RULE"
   | "POLYTYPO_MALFORMED_LOCALE_DATA"
   | "POLYTYPO_RULE_CONTRACT"
-  | "POLYTYPO_MALFORMED_INPUT";
+  | "POLYTYPO_MALFORMED_INPUT"
+  | "POLYTYPO_INVALID_OPTION";
 
 /** Codes are the contract across all five runtimes; messages are English and are not (ARCHITECTURE.md 4.6). */
 export class PolytypoError extends Error {
