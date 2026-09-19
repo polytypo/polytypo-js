@@ -40,6 +40,7 @@ export type {
   Dialect,
   LocaleData,
   LocaleSource,
+  NarrowNbsp,
   QuotePair,
   Rule,
   RuleContext,
