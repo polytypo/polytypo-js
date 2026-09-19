@@ -5,13 +5,14 @@ import {
   effectiveNeighbour,
   findDashTokens,
   isDashUnion,
-  isDigit,
   isOpenBracket,
   isSpaced,
   isSpacingTransitionBlocked,
   isStripBeforeOrCloseBracket,
+  rangeFlanks,
   sameContent,
   type DashStyle,
+  type RangeFlanks,
 } from "./dash-shared.js";
 
 /**
@@ -47,16 +48,18 @@ function isNonDecreasing(
   return true;
 }
 
-/** ranges.md 3.3, G1-G5. */
-function rangeGuardsPass(cp: readonly number[], left: number, right: number): boolean {
-  const n = cp.length;
-  let a = left;
-  while (a > 0 && isDigit(cp[a - 1] as number)) a -= 1;
-  let b = right;
-  while (b + 1 < n && isDigit(cp[b + 1] as number)) b += 1;
+/**
+ * ranges.md 3.2, G1-G5, over the flanks and digit runs ranges.md 3.2a's walk produced.
+ *
+ * `before` and `after` read past a matched outer closed-up symbol, so G1-G3 judge the text in
+ * front of the whole member rather than the symbol itself — which is what declines `US$15-US$20`
+ * on G1, where `before` is `S`.
+ */
+function rangeGuardsPass(cp: readonly number[], flanks: RangeFlanks): boolean {
+  const { left, right, a, b, outerLeft, outerRight } = flanks;
 
-  const before = effectiveNeighbour(cp, a - 1, -1);
-  const after = effectiveNeighbour(cp, b + 1, 1);
+  const before = effectiveNeighbour(cp, (outerLeft < 0 ? a : outerLeft) - 1, -1);
+  const after = effectiveNeighbour(cp, (outerRight < 0 ? b : outerRight) + 1, 1);
 
   // G1 — no letter adjacency.
   if (isLetter(before)) return false;
@@ -83,25 +86,31 @@ function scan(ctx: RuleContext): Edit[] {
   const style: DashStyle = ctx.locale.dash.range;
 
   for (const token of findDashTokens(cp)) {
-    const { leftCp, rightCp, left, right, lsp, rsp, spanStart, spanEnd } = token;
+    const { left, right, lsp, rsp, spanStart, spanEnd } = token;
 
-    // ranges.md 3.3 — a range candidate iff both flanks are DIGIT. `ranges` never processes any
-    // other token shape; that is `dashes`' territory, and `dashes` declines a digit-flanked
-    // token unconditionally too (operator decision, spec 0.5.0) — neither rule reinterprets the
-    // other's shape, whether or not `ranges` is enabled.
-    if (!isDigit(leftCp) || !isDigit(rightCp)) continue;
+    // ranges.md 3.2, 3.2a — a range candidate iff both flanks are DIGIT once a matched closed-up
+    // symbol has been walked over. `ranges` never processes any other token shape; that is
+    // `dashes`' territory, and `dashes` declines a candidate unconditionally too (operator
+    // decision, spec 0.5.0) — neither rule reinterprets the other's shape, whether or not
+    // `ranges` is enabled.
+    const flanks = rangeFlanks(cp, left, right);
+    if (flanks === undefined) continue;
 
-    if (!rangeGuardsPass(cp, left, right)) continue;
+    if (!rangeGuardsPass(cp, flanks)) continue;
 
     // `"none"`: the locale has no verified convention, so nothing is substituted.
     if (style === "none") continue;
 
     if (isSpaced(style)) {
+      // T1/T2 read the walked flanks, not the raw ones: ranges.md 3.2a makes `cp[L']`/`cp[R']`
+      // what every shared guard sees once a closed-up symbol has been consumed.
       // T1: a tight token may not become spaced across a digit run that has a far dash.
-      if (lsp === 0 && rsp === 0 && isSpacingTransitionBlocked(cp, left, right)) continue;
+      if (lsp === 0 && rsp === 0 && isSpacingTransitionBlocked(cp, flanks.left, flanks.right)) {
+        continue;
+      }
       // T2: the emitted U+0020 must not land where `spaces` (order 10) would delete it.
-      if (isStripBeforeOrCloseBracket(rightCp)) continue;
-      if (isOpenBracket(leftCp)) continue;
+      if (isStripBeforeOrCloseBracket(cp[flanks.right] as number)) continue;
+      if (isOpenBracket(cp[flanks.left] as number)) continue;
     }
 
     // ranges.md 3.3.1: never make an edit whose entire content is invisible. Try the unbound

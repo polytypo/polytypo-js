@@ -132,10 +132,16 @@ export function isOpenBracket(cp: number): boolean {
 }
 
 /**
- * dashes.md 3.2 step 7: the cluster alphabet is DASH ∪ INERT-DASH ∪ DIGIT ∪ JOINER. Shared
- * between `dashes` and `ranges` because a cluster like `2026-08-15` or `known-5-10` can contain
- * runs that belong to either rule, and the whole cluster must be inert to both if it holds two or
- * more dash runs (dashes.md 3.2 step 7).
+ * dashes.md 3.2 step 7: the cluster alphabet is DASH ∪ INERT-DASH ∪ DIGIT ∪ JOINER ∪
+ * CLOSED-SYMBOL. Shared between `dashes` and `ranges` because a cluster like `2026-08-15` or
+ * `known-5-10` can contain runs that belong to either rule, and the whole cluster must be inert
+ * to both if it holds two or more dash runs (dashes.md 3.2 step 7).
+ *
+ * CLOSED-SYMBOL joined the alphabet in spec 1.3.0, when ranges.md 3.2a made a symbol adjacent to
+ * a digit run part of a range token's own territory. Without it `a—$15-$20` is two clusters where
+ * `a—15-20` is one, so `dashes` converts the em dash, that edit moves the range's `before` from a
+ * dash to a space, and the range converts on the NEXT pass — a transform idempotency defect in
+ * every locale whose parenthetical form is spaced.
  */
 function isClusterMember(cp: number): boolean {
   return isDash(cp) || isInertDash(cp) || isDigit(cp) || cp === WORD_JOINER;
@@ -186,6 +192,86 @@ export function effectiveNeighbour(cp: readonly number[], from: number, step: nu
 }
 
 /**
+ * ranges.md 3.2a CLOSED-SYMBOL (spec 1.3.0) — the symbols conventionally written closed up to a
+ * number, as a literal code-point set. Not a Unicode category test: a category makes the verdict
+ * depend on which Unicode version a runtime was built against, and the five runtimes must agree
+ * (the same argument ranges.md 7.1 makes for DIGIT being ASCII-only). The Currency Symbols block
+ * is enumerated by its bounds, which never move.
+ */
+export function isClosedUpSymbol(cp: number): boolean {
+  return (
+    cp === 0x0024 || // DOLLAR SIGN
+    (cp >= 0x00a2 && cp <= 0x00a5) || // CENT, POUND, CURRENCY, YEN
+    (cp >= 0x20a0 && cp <= 0x20bf) || // Currency Symbols block
+    cp === 0x0025 || // PERCENT SIGN
+    cp === 0x2030 || // PER MILLE SIGN
+    cp === 0x2031 || // PER TEN THOUSAND SIGN
+    cp === 0x00b0 // DEGREE SIGN
+  );
+}
+
+/** ranges.md 3.2a — a token's flanks after the closed-up-symbol walk, with the digit runs the
+ * guards and the replacement then read. */
+export interface RangeFlanks {
+  /** Index of the DIGIT on each flank: `L\u2032`/`R\u2032` in ranges.md 3.2a. */
+  readonly left: number;
+  readonly right: number;
+  /** First index of Lrun and last index of Rrun. */
+  readonly a: number;
+  readonly b: number;
+  /** Index of the matched outer symbol on each side, or -1. `before`/`after` read past these
+   * (ranges.md 3.2a), so that G1-G3 judge the text in front of the whole member. */
+  readonly outerLeft: number;
+  readonly outerRight: number;
+}
+
+/**
+ * ranges.md 3.2 and 3.2a — is this token a range candidate, and where are its digit runs?
+ * Returns undefined when it is not one, which is the signal that the token belongs to `dashes`.
+ *
+ * A side consumes a closed-up symbol only when the opposite member repeats the same code point
+ * (`$15-$20`, `35%-50%`). An unmatched symbol leaves the flank a non-DIGIT, so `$15-\u20ac20` and
+ * `15-$20` are not candidates and do not change hands.
+ */
+export function rangeFlanks(
+  cp: readonly number[],
+  left: number,
+  right: number,
+): RangeFlanks | undefined {
+  const n = cp.length;
+  const innerRight =
+    isClosedUpSymbol(cp[right] as number) && right + 1 < n && isDigit(cp[right + 1] as number)
+      ? (cp[right] as number)
+      : undefined;
+  const innerLeft =
+    isClosedUpSymbol(cp[left] as number) && left > 0 && isDigit(cp[left - 1] as number)
+      ? (cp[left] as number)
+      : undefined;
+
+  const l = innerLeft === undefined ? left : left - 1;
+  const r = innerRight === undefined ? right : right + 1;
+  if (!isDigit(cp[l] as number) || !isDigit(cp[r] as number)) return undefined;
+
+  let a = l;
+  while (a > 0 && isDigit(cp[a - 1] as number)) a -= 1;
+  let b = r;
+  while (b + 1 < n && isDigit(cp[b + 1] as number)) b += 1;
+
+  let outerLeft = -1;
+  if (innerRight !== undefined) {
+    outerLeft = effectiveIndex(cp, a - 1, -1);
+    if (outerLeft < 0 || cp[outerLeft] !== innerRight) return undefined;
+  }
+  let outerRight = -1;
+  if (innerLeft !== undefined) {
+    outerRight = effectiveIndex(cp, b + 1, 1);
+    if (outerRight < 0 || cp[outerRight] !== innerLeft) return undefined;
+  }
+
+  return { left: l, right: r, a, b, outerLeft, outerRight };
+}
+
+/**
  * dashes.md 3.2 step 8 (T1) — spacing-transition guard. Shared because a `dashes` token
  * becoming spaced can insert a space next to a `ranges` token's digit run (or vice versa is
  * structurally impossible, since `ranges` styles are never `-spaced` in any v1 locale, but the
@@ -193,6 +279,18 @@ export function effectiveNeighbour(cp: readonly number[], from: number, step: nu
  * dashes.md 7.11 item 7 notes `dash.range` carries the same five-value enum as
  * `dash.parenthetical`).
  */
+/**
+ * T1's reach is transparent to one CLOSED-SYMBOL on either end of a digit run (spec 1.3.0). The
+ * digit run this guard protects may be a range member carrying an outer symbol — `$1 - $1--a`,
+ * `a--15% - 20%` — and reading the symbol as the neighbour would stop the walk one code point
+ * short of the dash it exists to find.
+ */
+function skipClosedUpSymbol(cp: readonly number[], from: number, step: number): number {
+  const i = effectiveIndex(cp, from, step);
+  if (i < 0 || !isClosedUpSymbol(cp[i] as number)) return from;
+  return i + step;
+}
+
 export function isSpacingTransitionBlocked(
   cp: readonly number[],
   left: number,
@@ -200,20 +298,32 @@ export function isSpacingTransitionBlocked(
 ): boolean {
   const n = cp.length;
 
-  if (isDigit(cp[left] as number)) {
-    let d = left;
+  // Spec 1.3.0: the reach steps over a CLOSED-SYMBOL that sits between the token and a digit
+  // run, because ranges.md 3.2a made that shape a range token — the digit run whose verdict this
+  // guard protects is one code point further out than it used to be.
+  const l =
+    isClosedUpSymbol(cp[left] as number) && left > 0 && isDigit(cp[left - 1] as number)
+      ? left - 1
+      : left;
+  const r =
+    isClosedUpSymbol(cp[right] as number) && right + 1 < n && isDigit(cp[right + 1] as number)
+      ? right + 1
+      : right;
+
+  if (isDigit(cp[l] as number)) {
+    let d = l;
     while (d > 0 && isDigit(cp[d - 1] as number)) d -= 1;
-    const i1 = effectiveIndex(cp, d - 1, -1);
+    const i1 = effectiveIndex(cp, skipClosedUpSymbol(cp, d - 1, -1), -1);
     const one = i1 < 0 ? NONE : (cp[i1] as number);
     const two = i1 < 0 ? NONE : effectiveNeighbour(cp, i1 - 1, -1);
     if (isDashUnion(one)) return true;
     if ((one === SPACE || isNoBreakSpace(one)) && isDashUnion(two)) return true;
   }
 
-  if (isDigit(cp[right] as number)) {
-    let d = right;
+  if (isDigit(cp[r] as number)) {
+    let d = r;
     while (d + 1 < n && isDigit(cp[d + 1] as number)) d += 1;
-    const i1 = effectiveIndex(cp, d + 1, 1);
+    const i1 = effectiveIndex(cp, skipClosedUpSymbol(cp, d + 1, 1), 1);
     const one = i1 < 0 ? NONE : (cp[i1] as number);
     const two = i1 < 0 ? NONE : effectiveNeighbour(cp, i1 + 1, 1);
     if (isDashUnion(one)) return true;
@@ -301,7 +411,11 @@ export function findDashTokens(cp: readonly number[]): DashToken[] {
 
     const leftCp = cp[left] as number;
     const rightCp = cp[right] as number;
-    if (crossedJoiner && !(isDigit(leftCp) && isDigit(rightCp))) continue;
+    // dashes.md 3.2a — re-entry across a joiner is only ever a bound range `ranges` produced on
+    // an earlier pass. As of spec 1.3.0 that shape includes a matched closed-up symbol on a
+    // flank (ranges.md 3.2a), so `$15<J>-<J>$20` re-enters the same way `1914<J>-<J>1918` does;
+    // without this a second pass would add a second joiner.
+    if (crossedJoiner && rangeFlanks(cp, left, right) === undefined) continue;
     if (isBreak(leftCp) || isBreak(rightCp)) continue;
 
     // dashes.md 3.2 step 6 — isolation guard.
