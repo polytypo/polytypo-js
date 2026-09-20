@@ -93,7 +93,7 @@ describe("narrowNbsp (nbsp.md §3.1a)", () => {
           return (error as PolytypoError).code;
         }
       };
-      expect(codeOf({ locale: "fr", mode: "yaml", narrowNbsp: "wide" })).toBe(
+      expect(codeOf({ locale: "fr", mode: "asciidoc", narrowNbsp: "wide" })).toBe(
         "POLYTYPO_INVALID_MODE",
       );
       expect(codeOf({ locale: "fr", narrowNbsp: "wide", rules: { nope: true } })).toBe(

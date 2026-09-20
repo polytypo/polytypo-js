@@ -19,8 +19,8 @@ function chunkRequiresOf(source) {
   return new Set(matches.map((m) => m[1]));
 }
 
-const [textSrc, htmlSrc, markdownSrc, indexSrc] = await Promise.all(
-  ["text.cjs", "html.cjs", "markdown.cjs", "index.cjs"].map((f) =>
+const [textSrc, htmlSrc, markdownSrc, yamlSrc, indexSrc] = await Promise.all(
+  ["text.cjs", "html.cjs", "markdown.cjs", "yaml.cjs", "index.cjs"].map((f) =>
     readFile(path.join(DIST, f), "utf8"),
   ),
 );
@@ -28,12 +28,14 @@ const [textSrc, htmlSrc, markdownSrc, indexSrc] = await Promise.all(
 const textChunks = chunkRequiresOf(textSrc);
 const htmlChunks = chunkRequiresOf(htmlSrc);
 const markdownChunks = chunkRequiresOf(markdownSrc);
+const yamlChunks = chunkRequiresOf(yamlSrc);
 const indexChunks = chunkRequiresOf(indexSrc);
 
 assert.ok(textChunks.size > 0, "dist/text.cjs requires no local chunk — unexpected build shape");
 
 const sharedWithHtml = [...textChunks].filter((c) => htmlChunks.has(c));
 const sharedWithMarkdown = [...textChunks].filter((c) => markdownChunks.has(c));
+const sharedWithYaml = [...textChunks].filter((c) => yamlChunks.has(c));
 const sharedWithIndex = [...textChunks].filter((c) => indexChunks.has(c));
 
 assert.ok(
@@ -45,10 +47,14 @@ assert.ok(
   "dist/text.cjs and dist/markdown.cjs share no chunk — CJS splitting regressed to per-entry duplication",
 );
 assert.ok(
+  sharedWithYaml.length > 0,
+  "dist/text.cjs and dist/yaml.cjs share no chunk — CJS splitting regressed to per-entry duplication",
+);
+assert.ok(
   sharedWithIndex.length > 0,
   "dist/text.cjs and dist/index.cjs share no chunk — CJS splitting regressed to per-entry duplication",
 );
 
 console.log(
-  `chunk-sharing-smoke: ok (text/html/markdown/index share ${sharedWithHtml[0]} and friends across dist/*.cjs)`,
+  `chunk-sharing-smoke: ok (text/html/markdown/yaml/index share ${sharedWithHtml[0]} and friends across dist/*.cjs)`,
 );

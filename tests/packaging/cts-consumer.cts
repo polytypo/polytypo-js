@@ -7,6 +7,7 @@
 import { transform as transformAggregate, type Options } from "polytypo";
 import { transform as transformHtml, type HtmlOptions } from "polytypo/html";
 import { transform as transformMarkdown, type MarkdownOptions } from "polytypo/markdown";
+import { transform as transformYaml, type YamlOptions } from "polytypo/yaml";
 import { transform as transformText, type TextOptions } from "polytypo/text";
 
 const aggregateOptions: Options = { locale: "en-US", mode: "text" };
@@ -20,3 +21,5 @@ transformHtml("x", htmlOptions);
 
 const markdownOptions: MarkdownOptions = { locale: "en-US", dialect: "commonmark" };
 transformMarkdown("x", markdownOptions);
+const yamlOptions: YamlOptions = { locale: "en-US", keys: ["description"] };
+transformYaml("description: x\n", yamlOptions);

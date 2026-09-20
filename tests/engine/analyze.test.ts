@@ -25,7 +25,9 @@ describe("analyze (analyze.md)", () => {
     });
 
     it("throws POLYTYPO_INVALID_MODE for an unknown mode", () => {
-      expect(() => analyze("x", { locale: "en-US", mode: "yaml" as never })).toThrow(PolytypoError);
+      expect(() => analyze("x", { locale: "en-US", mode: "asciidoc" as never })).toThrow(
+        PolytypoError,
+      );
     });
 
     it("requires a dialect in markdown mode, as transform does", () => {
@@ -78,6 +80,7 @@ describe("analyze (analyze.md)", () => {
             locale: data.locale,
             ...(testCase.mode !== undefined ? { mode: testCase.mode } : {}),
             ...(testCase.dialect !== undefined ? { dialect: testCase.dialect } : {}),
+            ...(testCase.keys !== undefined ? { keys: testCase.keys } : {}),
             ...(testCase.rules !== undefined ? { rules: testCase.rules } : {}),
           } as never;
           const input = testCase.in as string;

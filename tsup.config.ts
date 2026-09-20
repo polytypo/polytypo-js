@@ -52,6 +52,7 @@ export default defineConfig({
     text: "src/index.text.ts",
     html: "src/index.html.ts",
     markdown: "src/index.markdown.ts",
+    yaml: "src/index.yaml.ts",
   },
   format: ["esm", "cjs"],
   outExtension: ({ format }) => ({ js: format === "cjs" ? ".cjs" : ".js" }),

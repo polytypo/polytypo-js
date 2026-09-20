@@ -16,7 +16,7 @@ export const RESOLUTION_FILE = path.join(FIXTURES_DIR, "locale-resolution.json")
 /** Not a locale fixture file: resolution cases have no rule, no mode and no text. */
 const RESOLUTION_NAME = "locale-resolution.json";
 
-const MODES: readonly string[] = ["text", "html", "markdown"];
+const MODES: readonly string[] = ["text", "html", "markdown", "yaml"];
 const DIALECTS: readonly string[] = ["commonmark", "mdx"];
 
 export interface ConformanceCase {
@@ -36,6 +36,12 @@ export interface ConformanceCase {
   readonly rules?: Options["rules"];
   /** spec 1.3.0, nbsp.md §3.1a. Passed straight through, on BOTH calls — see the runner. */
   readonly narrowNbsp?: Options["narrowNbsp"];
+  /**
+   * Required exactly when `mode` is `"yaml"`, forbidden otherwise — mirrors the schema's second
+   * `allOf` conditional (modes.md 3.8.2: `keys` has no default, so a fixture must name the
+   * processable keys exactly as a caller would; an empty list is legal and processes nothing).
+   */
+  readonly keys?: readonly string[] | undefined;
 }
 
 export interface ConformanceFile {
@@ -80,6 +86,23 @@ function optionalString(value: unknown, where: string): string | undefined {
 function requireArray(value: unknown, where: string): readonly unknown[] {
   if (!Array.isArray(value)) throw new Error(`${where}: expected an array`);
   return value;
+}
+
+/** modes.md 3.8.2: required exactly when `mode` is `"yaml"`, forbidden otherwise. */
+function parseKeys(value: unknown, mode: string, where: string): readonly string[] | undefined {
+  if (mode === "yaml") {
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `${where}: "keys" is required when "mode" is "yaml" (modes.md 3.8.2 — no default, so a ` +
+          `fixture must name the processable keys exactly as a caller would)`,
+      );
+    }
+    return value.map((key, index) => requireString(key, `${where} "keys"[${index}]`));
+  }
+  if (value !== undefined) {
+    throw new Error(`${where}: "keys" is only meaningful when "mode" is "yaml"`);
+  }
+  return undefined;
 }
 
 function parseNarrowNbsp(value: unknown, where: string): Options["narrowNbsp"] {
@@ -142,6 +165,7 @@ function parseCase(raw: unknown, where: string): ConformanceCase {
     note: optionalString(raw.note, `${where} "note"`),
     rules: parseRuleOverrides(raw.rules, where),
     narrowNbsp: parseNarrowNbsp(raw.narrowNbsp, where),
+    keys: parseKeys(raw.keys, mode, where),
   };
 }
 

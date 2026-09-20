@@ -3,22 +3,23 @@ import type { Mode, Options } from "../types.js";
 import { analyzeHtmlPipeline, runHtmlPipeline } from "./html-pipeline.js";
 import { analyzeMarkdownPipeline, runMarkdownPipeline } from "./markdown-pipeline.js";
 import { analyzeTextPipeline, runTextPipeline } from "./text-pipeline.js";
+import { analyzeYamlPipeline, runYamlPipeline } from "./yaml-pipeline.js";
 import type { Change } from "./origin.js";
 
 export { planRules } from "./rule-runner.js";
 
 function resolveMode(mode: Mode | undefined): Mode {
   if (mode === undefined || mode === "text") return "text";
-  if (mode === "html" || mode === "markdown") return mode;
+  if (mode === "html" || mode === "markdown" || mode === "yaml") return mode;
   throw new PolytypoError(
     "POLYTYPO_INVALID_MODE",
-    `Unknown mode "${String(mode)}". Expected "text", "html" or "markdown".`,
+    `Unknown mode "${String(mode)}". Expected "text", "html", "markdown" or "yaml".`,
   );
 }
 
 /**
  * The aggregate entry's dispatcher: every mode is reachable, so it is the only pipeline module
- * that imports all three mode-specific ones (and therefore the only one whose module graph
+ * that imports all four mode-specific ones (and therefore the only one whose module graph
  * includes both `parse5` and the Micromark/MDX stack). `polytypo/text`, `polytypo/html` and
  * `polytypo/markdown` each call their own mode-specific pipeline directly and never import this
  * module (AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1).
@@ -31,6 +32,7 @@ export function runPipeline(input: string, options: Options): string {
   const mode = resolveMode(given.mode);
   if (mode === "text") return runTextPipeline(input, given);
   if (mode === "html") return runHtmlPipeline(input, given);
+  if (mode === "yaml") return runYamlPipeline(input, given);
   return runMarkdownPipeline(input, given);
 }
 
@@ -44,5 +46,6 @@ export function runAnalyze(input: string, options: Options): Change[] {
   const mode = resolveMode(given.mode);
   if (mode === "text") return analyzeTextPipeline(input, given);
   if (mode === "html") return analyzeHtmlPipeline(input, given);
+  if (mode === "yaml") return analyzeYamlPipeline(input, given);
   return analyzeMarkdownPipeline(input, given);
 }

@@ -16,6 +16,9 @@ import { NO_ORIGIN } from "../engine/origin.js";
 export { LINE_MARKER, MARKER, isMarker } from "../engine/sentinels.js";
 
 /** `BREAK` as the rules define it (`spaces.md` 3.1), tested against the gap's raw source. */
+/** U+0020, the one emitted code point whose meaning is positional (modes.md 3.4, 5 item 2). */
+const SPACE = 0x20;
+
 const LINE_TERMINATORS: ReadonlySet<number> = new Set([
   0x0a, 0x0d, 0x0b, 0x0c, 0x85, 0x2028, 0x2029,
 ]);
@@ -160,7 +163,18 @@ export function filterBoundaryEdits(
     const d = edit.end - edit.start;
     const r = edit.replacement.length;
     const span = spanContaining(ranges, p);
-    if (span !== undefined && r > d && (p === span.first || q === span.last)) continue;
+    if (span !== undefined && (p === span.first || q === span.last)) {
+      if (r > d) continue;
+      // The character clause. `r > d` is not the rule, only a formalisation of it that misses
+      // `r === d`: `dashes` P3 admits a run of THREE dashes, so `---` -> `␣–␣` is 3 -> 3 and the
+      // length test sees nothing while U+0020 lands on both extremities anyway. Testing the
+      // character catches it, and only U+0020 needs testing — it is the one code point any rule
+      // emits whose meaning comes from its position rather than from itself (modes.md 5 item 2).
+      const first = edit.replacement[0];
+      const last = edit.replacement[r - 1];
+      if (r > 0 && p === span.first && first === SPACE && cp[p] !== SPACE) continue;
+      if (r > 0 && q === span.last && last === SPACE && cp[q] !== SPACE) continue;
+    }
 
     out.push(edit);
   }

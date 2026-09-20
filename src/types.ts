@@ -1,4 +1,4 @@
-export type Mode = "text" | "html" | "markdown";
+export type Mode = "text" | "html" | "markdown" | "yaml";
 
 /**
  * `markdown` is not one language (spec/rules/modes.md 3.7.1). CommonMark and MDX disagree on
@@ -23,8 +23,15 @@ export interface Options {
   /** Required. An unknown locale throws; there is never a fallback to English. */
   locale: string;
   mode?: Mode;
-  /** Required when `mode` is `"markdown"`, with no default; ignored in `text` and `html`. */
+  /** Required when `mode` is `"markdown"`, with no default; ignored in the other three modes. */
   dialect?: Dialect;
+  /**
+   * Required when `mode` is `"yaml"`, with no default; ignored in the other three modes
+   * (spec/rules/modes.md §3.8.2). The mapping keys whose scalar values are processable — YAML is
+   * a data format with islands of prose in it, so the caller names them and the library never
+   * guesses. An empty list is legal and processes nothing.
+   */
+  keys?: readonly string[];
   /**
    * Per-rule override, keyed by `RuleId`. For a default-on rule (every rule except `ranges`),
    * `false` disables it and `true` is a no-op. For `ranges` — off by default (spec 0.5.0) —

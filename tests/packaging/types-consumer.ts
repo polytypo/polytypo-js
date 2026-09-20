@@ -7,6 +7,7 @@
 import { transform as transformAggregate, type Options } from "polytypo";
 import { transform as transformHtml, type HtmlOptions } from "polytypo/html";
 import { transform as transformMarkdown, type MarkdownOptions } from "polytypo/markdown";
+import { transform as transformYaml, type YamlOptions } from "polytypo/yaml";
 import { transform as transformText, type TextOptions } from "polytypo/text";
 
 // Aggregate entry: all three modes remain legal, exactly as before this stage.
@@ -36,3 +37,13 @@ void markdownOptionsMissingDialect;
 // @ts-expect-error MarkdownOptions has no `mode` field — a literal with one is a compile error.
 const markdownOptionsBad: MarkdownOptions = { ...markdownOptions, mode: "text" };
 void markdownOptionsBad;
+
+// polytypo/yaml: `keys` is required, `mode` is not a field of YamlOptions.
+const yamlOptions: YamlOptions = { locale: "en-US", keys: ["description"] };
+transformYaml("description: x\n", yamlOptions);
+// @ts-expect-error keys is required on YamlOptions — omitting it is a compile error.
+const yamlOptionsMissingKeys: YamlOptions = { locale: "en-US" };
+void yamlOptionsMissingKeys;
+// @ts-expect-error YamlOptions has no `mode` field — a literal with one is a compile error.
+const yamlOptionsBad: YamlOptions = { ...yamlOptions, mode: "text" };
+void yamlOptionsBad;
