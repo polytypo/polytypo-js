@@ -69,11 +69,11 @@ describe("scripts/lib/spec-tag.mjs — parseStrictSpecVersion()", () => {
     }
   });
 
-  it("derives spec-v1.2.0 from this repository's real, current spec/VERSION", () => {
+  it("derives the spec tag from this repository's real, current spec/VERSION", () => {
     const raw = readFileSync(path.join(ROOT, "spec", "VERSION"), "utf8");
     const parsed = parseStrictSpecVersion(raw);
-    expect(parsed).toEqual({ ok: true, version: "1.2.0" });
-    if (parsed.ok) expect(deriveSpecTagName(parsed.version)).toBe("spec-v1.2.0");
+    expect(parsed).toEqual({ ok: true, version: "1.3.0" });
+    if (parsed.ok) expect(deriveSpecTagName(parsed.version)).toBe("spec-v1.3.0");
   });
 });
 

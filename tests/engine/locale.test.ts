@@ -64,7 +64,9 @@ describe("locale resolution", () => {
 
   it("never falls back to English", () => {
     expect(() => resolveLocaleTag("xx")).toThrow(PolytypoError);
-    expect(() => resolveLocaleTag("es")).toThrow(PolytypoError);
+    // `es` was the example here until spec 1.3.0 carried it. A tag the registry holds resolves
+    // (locale-resolution.md §3.4 step 1); the claim this case makes needs one it does not.
+    expect(() => resolveLocaleTag("ja")).toThrow(PolytypoError);
   });
 });
 
