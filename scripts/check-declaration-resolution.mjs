@@ -25,6 +25,7 @@ const ENTRIES = [
   { specifier: "polytypo/text", name: "text" },
   { specifier: "polytypo/html", name: "html" },
   { specifier: "polytypo/markdown", name: "markdown" },
+  { specifier: "polytypo/yaml", name: "yaml" },
 ];
 
 // The containing file's own extension is what tells NodeNext resolution which condition

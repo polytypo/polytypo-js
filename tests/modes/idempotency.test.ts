@@ -83,6 +83,66 @@ describe.skipIf(!hasLocales)("bounded exhaustive idempotency sweep across span b
   }
 });
 
+/**
+ * `yaml` gets its own alphabet and templates rather than joining CONFIGS: modes.md 5 requires
+ * `:`, `#` and `-` in the sweep alphabet for this mode specifically, because those are the
+ * characters whose adjacency to an emitted U+0020 the span-stability argument turns on — and
+ * putting them in the shared alphabet would grow every other config's sweep for nothing.
+ */
+const YAML_SWEEP_ALPHABET = ['"', "'", "-", ":", "#", " ", ".", "a", "–", "”"];
+
+/** A block scalar puts a line marker between every pair of spans; a plain scalar exercises the
+ * `:`/`#` split, which puts an inline marker between them instead. */
+const YAML_TEMPLATES: ReadonlyArray<{
+  label: string;
+  of: (a: string, b: string, c: string) => string;
+}> = [
+  { label: "block scalar", of: (a, b, c) => `k: |\n  ${a}\n  ${b}\n  ${c}\n` },
+  { label: "plain scalar", of: (a, b, c) => `k: ${a}${b}${c}\n` },
+];
+
+function* yamlSplits(): Generator<[string, string, string]> {
+  let frontier = [""];
+  const all: string[] = [""];
+  for (let length = 1; length <= MAX_LENGTH; length += 1) {
+    const next: string[] = [];
+    for (const prefix of frontier) {
+      for (const char of YAML_SWEEP_ALPHABET) {
+        next.push(prefix + char);
+        all.push(prefix + char);
+      }
+    }
+    frontier = next;
+  }
+  for (const whole of all) {
+    for (let i = 0; i <= whole.length; i += 1) {
+      for (let j = i; j <= whole.length; j += 1) {
+        yield [whole.slice(0, i), whole.slice(i, j), whole.slice(j)];
+      }
+    }
+  }
+}
+
+describe.skipIf(!hasLocales)("bounded exhaustive idempotency sweep, yaml mode", () => {
+  for (const tpl of YAML_TEMPLATES) {
+    for (const locale of locales) {
+      it(`every yaml ${tpl.label} document up to ${MAX_LENGTH} swept characters is idempotent in ${locale}`, () => {
+        const options: Options = { locale, mode: "yaml", keys: ["k"] };
+        const broken: string[] = [];
+        for (const [a, b, c] of yamlSplits()) {
+          const input = tpl.of(a, b, c);
+          const once = transform(input, options);
+          if (transform(once, options) !== once) {
+            broken.push(JSON.stringify(input));
+            if (broken.length >= 10) break;
+          }
+        }
+        expect(broken, `first non-idempotent yaml ${tpl.label} inputs in ${locale}`).toEqual([]);
+      });
+    }
+  }
+});
+
 describe.skipIf(!hasLocales)("idempotency over generated documents", () => {
   const DOCUMENT_PARTS = [
     '<p class="x">',

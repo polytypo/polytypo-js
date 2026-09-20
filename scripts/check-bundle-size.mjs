@@ -32,6 +32,7 @@ const ENTRIES = [
   { name: "text", file: "src/index.text.ts", globalName: "PolytypoText" },
   { name: "html", file: "src/index.html.ts", globalName: "PolytypoHtml" },
   { name: "markdown", file: "src/index.markdown.ts", globalName: "PolytypoMarkdown" },
+  { name: "yaml", file: "src/index.yaml.ts", globalName: "PolytypoYaml" },
 ];
 
 // The pre-split, single-entry aggregate bundle, as reported in the original audit

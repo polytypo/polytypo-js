@@ -9,6 +9,7 @@ const {
   PolytypoError: PolytypoErrorFromMarkdown,
   transform: transformMarkdown,
 } = require("polytypo/markdown");
+const { PolytypoError: PolytypoErrorFromYaml, transform: transformYaml } = require("polytypo/yaml");
 const { PolytypoError: PolytypoErrorFromText, transform: transformText } = require("polytypo/text");
 
 const locale = "en-US";
@@ -35,6 +36,7 @@ assert.equal(
 assert.equal(PolytypoErrorFromText, PolytypoError);
 assert.equal(PolytypoErrorFromHtml, PolytypoError);
 assert.equal(PolytypoErrorFromMarkdown, PolytypoError);
+assert.equal(PolytypoErrorFromYaml, PolytypoError);
 
 assert.throws(
   () => transformText("x", { locale, mode: "html" }),
@@ -51,6 +53,8 @@ assert.throws(
 
 assert.equal(transformAggregate("x...y", { locale }), "x…y");
 assert.equal(transformAggregate("<p>x...y</p>", { locale, mode: "html" }), "<p>x…y</p>");
+assert.equal(transformYaml("a: x...y\n", { locale, keys: ["a"] }), "a: x…y\n");
+
 assert.equal(
   transformAggregate("x...y", { locale, mode: "markdown", dialect: "commonmark" }),
   "x…y",

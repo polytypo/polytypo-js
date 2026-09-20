@@ -57,6 +57,7 @@ the parsers that mode needs:
 | `polytypo/text`     | none                                                          |
 | `polytypo/html`     | parse5                                                        |
 | `polytypo/markdown` | parse5, micromark and its GFM, frontmatter and MDX extensions |
+| `polytypo/yaml`     | none                                                          |
 | `polytypo`          | all of the above                                              |
 
 HTML and Markdown are first-class modes, not an afterthought — tags, attributes and fenced code
@@ -69,6 +70,27 @@ transform(`<a title="test... wait">Wait... she said "go on."</a>`, { locale: "en
 // <a title="test... wait">Wait… she said “go on.”</a>
 ```
 
+`yaml` mode is the one that asks something of you, and it asks for a reason. YAML is a data format
+with prose in some of it, so you name the keys whose values are prose; there is no default and no
+guess:
+
+```ts
+import { transform } from "polytypo/yaml";
+
+transform("summary: Rates -- all of them...\nrun: git diff -- a--b\n", {
+  locale: "en-US",
+  keys: ["summary"],
+});
+// summary: Rates—all of them…
+// run: git diff -- a--b
+```
+
+Nothing in YAML's syntax separates a sentence from a shell script: `description` holds one and
+`run` holds the other, spelled identically. Without `keys` the same document comes back with
+`if !` rewritten as `if!`. Quoting, indentation, anchors and a block scalar's chomping indicator
+are never decoded and rewritten — the file is located, not re-emitted — so the trailing newlines
+of a `|+` block come back exactly as you wrote them.
+
 In `markdown` mode the skipped regions are the dialect's own structural ones, not whatever looks
 like code. CommonMark counts an indented block as code at **four** spaces; at two it is an ordinary
 paragraph, so a JSON sample indented by two comes back with curly quotes — valid JSON in, invalid
@@ -79,7 +101,7 @@ both dialects.
 
 `analyze()` runs the same pipeline and reports what it would do instead of doing it — one record
 per edit, each with the rule that made it and code-point offsets into the input you passed (into
-the **document**, in `html` and `markdown` mode, not into a span):
+the **document**, in `html`, `markdown` and `yaml` mode, not into a span):
 
 ```ts
 import { analyze } from "polytypo";

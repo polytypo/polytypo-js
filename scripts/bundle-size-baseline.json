@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1."
+    "description": "Post-split baseline: measured from the separate entry points (four at the split, plus `yaml` at spec 1.3.0), for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1."
   },
   "index": {
     "raw": 679497,
@@ -17,5 +17,9 @@
   "markdown": {
     "raw": 679049,
     "gzip": 196410
+  },
+  "yaml": {
+    "raw": 177248,
+    "gzip": 51505
   }
 }

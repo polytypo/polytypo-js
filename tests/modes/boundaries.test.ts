@@ -214,6 +214,33 @@ describe("the edge-growth rule (modes.md 3.4)", () => {
       expect(html("a<em>x — y</em>b", locale), locale).toBe(expected);
     }
   });
+
+  it("declines a three-dash run at a span edge in every locale that emits a spaced dash", () => {
+    // The character clause of modes.md 3.4 (spec 1.3.0). `dashes` P3 admits a run of two OR
+    // THREE, so `---` -> `␣–␣` is 3 -> 3: the length clause sees nothing and U+0020 lands on both
+    // extremities anyway. Before the clause this produced `a<em> – </em>b` — an element beginning
+    // and ending with a space it never held, which is the harm 7.3 exists to prevent, and
+    // `x * – * y`, which de-flanks the asterisks and breaks the span partition of 5 item 2.
+    for (const locale of Object.keys(LOCALES)) {
+      const spaced = LOCALES[locale]?.dash?.parenthetical?.endsWith("-spaced") ?? false;
+      if (!spaced) continue;
+      expect(html("a<em>---</em>b", locale), locale).toBe("a<em>---</em>b");
+      expect(
+        transform("x *---* y", { locale, mode: "markdown", dialect: "commonmark" }),
+        locale,
+      ).toBe("x *---* y");
+    }
+  });
+
+  it("still applies the same three-dash edit interior to a span, and at an edge where it emits no space", () => {
+    expect(html("<p>a---b</p>", "de-DE")).toBe("<p>a – b</p>");
+    // em-tight emits no U+0020 at all, so the character clause does not fire at the extremity.
+    expect(html("a<em>---</em>b", "en-US")).toBe("a<em>—</em>b");
+  });
+
+  it("still applies a -spaced edit that replaces a space with a space at an edge", () => {
+    expect(html("a<em>x --- y</em>b", "de-DE")).toBe("a<em>x – y</em>b");
+  });
 });
 
 describe("span bookkeeping", () => {

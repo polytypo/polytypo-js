@@ -1,5 +1,6 @@
 // ESM import smoke test — imports every public entry point through its published package path
-// ("polytypo", "polytypo/text", "polytypo/html", "polytypo/markdown"), relying on Node's
+// ("polytypo", "polytypo/text", "polytypo/html", "polytypo/markdown", "polytypo/yaml"),
+// relying on Node's
 // self-reference resolution (a package can import itself by name via its own `exports` map).
 // Requires `npm run build` to have already produced dist/. Run via `npm run test:packaging`.
 import assert from "node:assert/strict";
@@ -10,6 +11,7 @@ import {
   transform as transformMarkdown,
 } from "polytypo/markdown";
 import { PolytypoError as PolytypoErrorFromText, transform as transformText } from "polytypo/text";
+import { PolytypoError as PolytypoErrorFromYaml, transform as transformYaml } from "polytypo/yaml";
 
 const locale = "en-US";
 
@@ -26,6 +28,12 @@ assert.equal(
   transformAggregate("<p>x...y</p>", { locale, mode: "html" }),
 );
 
+assert.equal(transformYaml("a: x...y\n", { locale, keys: ["a"] }), "a: x…y\n");
+assert.equal(
+  transformYaml("a: x...y\n", { locale, keys: ["a"] }),
+  transformAggregate("a: x...y\n", { locale, mode: "yaml", keys: ["a"] }),
+);
+
 assert.equal(transformMarkdown("x...y", { locale, dialect: "commonmark" }), "x…y");
 assert.equal(transformMarkdown("x...y", { locale, dialect: "mdx" }), "x…y");
 assert.equal(
@@ -38,6 +46,7 @@ assert.equal(
 assert.equal(PolytypoErrorFromText, PolytypoError);
 assert.equal(PolytypoErrorFromHtml, PolytypoError);
 assert.equal(PolytypoErrorFromMarkdown, PolytypoError);
+assert.equal(PolytypoErrorFromYaml, PolytypoError);
 
 // Each fixed-mode entry rejects an explicit conflicting `mode` rather than silently ignoring it.
 assert.throws(

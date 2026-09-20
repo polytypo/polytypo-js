@@ -14,6 +14,10 @@ export const PACKAGES = {
   gfm: /node_modules\/micromark-extension-gfm\//,
   frontmatter: /node_modules\/micromark-extension-frontmatter\//,
   mdx: /node_modules\/micromark-extension-mdxjs\//,
+  // Not a production dependency: `yaml` is the devDependency that tests/modes/yaml-structure.ts
+  // uses as a reference oracle. It is forbidden in EVERY entry, which is what enforces
+  // spec/rules/modes.md 3.8.1 — `yaml` mode selects spans with a specified scan, never a parser.
+  yamlParser: /node_modules\/yaml\//,
 };
 
 // Every micromark-family package, including `micromark`'s own internal utility/core
@@ -40,10 +44,15 @@ const MARKDOWN_STACK_FORBIDDEN = [
 ];
 
 export const ENTRIES = {
-  text: { forbidden: [...ALL_FIVE, MICROMARK_FAMILY], required: [] },
-  html: { forbidden: MARKDOWN_STACK_FORBIDDEN, required: [PACKAGES.parse5] },
-  markdown: { forbidden: [], required: ALL_FIVE },
-  index: { forbidden: [], required: ALL_FIVE },
+  text: { forbidden: [...ALL_FIVE, MICROMARK_FAMILY, PACKAGES.yamlParser], required: [] },
+  // `yaml` mode uses no parser (spec/rules/modes.md 3.8.1); this is where that is enforced.
+  yaml: { forbidden: [...ALL_FIVE, MICROMARK_FAMILY, PACKAGES.yamlParser], required: [] },
+  html: {
+    forbidden: [...MARKDOWN_STACK_FORBIDDEN, PACKAGES.yamlParser],
+    required: [PACKAGES.parse5],
+  },
+  markdown: { forbidden: [PACKAGES.yamlParser], required: ALL_FIVE },
+  index: { forbidden: [PACKAGES.yamlParser], required: ALL_FIVE },
 };
 
 /** Every `inputs` entry whose path matches at least one of `patterns`. */
