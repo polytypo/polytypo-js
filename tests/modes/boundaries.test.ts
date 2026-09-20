@@ -201,14 +201,16 @@ describe("the edge-growth rule (modes.md 3.4)", () => {
       expect(html("a<em>–</em>b", locale), locale).toBe("a<em>–</em>b");
     }
     // `a<em>x — y</em>b` is EM, spaced, with room inside the span for the dash to change
-    // length. en-US (`em-tight`) closes the spacing; de-CH/de-DE/en-GB/fi/sv (`en-spaced`)
-    // convert the length; el/fr/fr-CA/ru (`em-spaced` or `none`) are already correct.
-    const enSpaced = ["de-CH", "de-DE", "en-GB", "fi", "sv"];
+    // length. An `em-tight` locale closes the spacing; an `en-spaced` one converts the length;
+    // `em-spaced` and `none` are already correct. The three groups are READ from the locale
+    // data: the list used to be spelled out here, and it silently went stale the moment spec
+    // 1.3.0 added four more `en-spaced` locales.
     for (const locale of Object.keys(LOCALES)) {
+      const parenthetical = LOCALES[locale]?.dash?.parenthetical;
       const expected =
-        locale === "en-US"
+        parenthetical === "em-tight"
           ? "a<em>x—y</em>b"
-          : enSpaced.includes(locale)
+          : parenthetical === "en-spaced"
             ? "a<em>x – y</em>b"
             : "a<em>x — y</em>b";
       expect(html("a<em>x — y</em>b", locale), locale).toBe(expected);
