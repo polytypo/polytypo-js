@@ -70,10 +70,16 @@ describe("scripts/lib/spec-tag.mjs — parseStrictSpecVersion()", () => {
   });
 
   it("derives the spec tag from this repository's real, current spec/VERSION", () => {
+    // Asserted against the vendored file rather than a literal: the point is that the real
+    // VERSION parses and yields the tag the release gate will look for, which stays true across
+    // spec bumps. A literal here silently fails the first release after a bump instead.
     const raw = readFileSync(path.join(ROOT, "spec", "VERSION"), "utf8");
     const parsed = parseStrictSpecVersion(raw);
-    expect(parsed).toEqual({ ok: true, version: "1.3.0" });
-    if (parsed.ok) expect(deriveSpecTagName(parsed.version)).toBe("spec-v1.3.0");
+    expect(parsed.ok, `spec/VERSION does not parse: ${JSON.stringify(raw)}`).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(parsed.version).toBe(raw.trim());
+    expect(deriveSpecTagName(parsed.version)).toBe(`spec-v${parsed.version}`);
   });
 });
 
