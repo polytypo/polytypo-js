@@ -1,25 +1,25 @@
 {
   "_meta": {
-    "description": "Post-split baseline: measured from the separate entry points (four at the split, plus `yaml` at spec 1.3.0), for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured for spec 1.3.0, which took the registry from ten locales to eighteen: every entry grew by roughly the embedded weight of eight more locale files (`text` most visibly, since it is almost nothing else). That is data, not code, and it is not what the 5% budget is for — the budget exists to catch a parser reaching an entry that must not have one, and scripts/check-entry-reach.mjs proves that independently against the real module graph."
+    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured again for spec 1.4.0 on the same grounds: quotes.elisionClitics adds two short lists to eight locale files, and the citations backing them add prose to those files' `sources`, which is part of the public LocaleData type and therefore embedded. Growth is ~22 KB raw / ~5 KB gzip per entry, visible as +7% on `text` and `yaml` because those entries are almost nothing but data. No code path was added to any entry; scripts/check-entry-reach.mjs still proves the module graph independently. Worth a separate look some day: `sources` is citation prose no runtime reads, and it ships to every browser."
   },
   "index": {
-    "raw": 822201,
-    "gzip": 235321
+    "raw": 844934,
+    "gzip": 240322
   },
   "text": {
-    "raw": 304821,
-    "gzip": 85674
+    "raw": 327541,
+    "gzip": 90817
   },
   "html": {
-    "raw": 472518,
-    "gzip": 135766
+    "raw": 495248,
+    "gzip": 141189
   },
   "markdown": {
-    "raw": 817816,
-    "gzip": 234615
+    "raw": 840549,
+    "gzip": 239946
   },
   "yaml": {
-    "raw": 310380,
-    "gzip": 87680
+    "raw": 333100,
+    "gzip": 92782
   }
 }
