@@ -58,6 +58,21 @@ export interface QuotePair {
 }
 
 /**
+ * The word fragments that attach across an elision or possessive apostrophe, read only when the
+ * mark is flush against modes.md §3.2's inline boundary marker (quotes.md §3.2, spec 1.4.0).
+ * Both lists are POSITIONAL, not attachment claims: `before` is matched against the maximal
+ * LETTER run ending before the mark (French `l'`, `d'`, `qu'`, `jusqu'`), `after` against the run
+ * beginning after it (English `x's`, Dutch `'s morgens`). The word a fragment attaches to may lie
+ * on the far side of the boundary and so be absent from the rule's input, which is the whole
+ * reason this veto exists. Entries are lowercase, LETTER-only, and cited in the locale's
+ * `sources`.
+ */
+export interface ElisionClitics {
+  readonly before: readonly string[];
+  readonly after: readonly string[];
+}
+
+/**
  * A closed-set elision idiom — quotes.md 3.2's listed elision veto. Matching `elided` alone
  * cannot distinguish an idiom (`rock 'n' roll`) from an arbitrary quoted word
  * (`The letter 'n' is common.`); `left`/`right` are the surrounding context that does.
@@ -86,6 +101,12 @@ export interface LocaleData {
     readonly secondary: QuotePair;
     /** May be empty. Empty means no verified idiom of this shape for this locale. */
     readonly elisionIdioms: readonly ElisionIdiom[];
+    /**
+     * `quotes.elisionClitics` — spec/rules/quotes.md §3.2's span-boundary elision veto (spec
+     * 1.4.0). Both lists may be empty, and empty is a total no-op: a locale with no citable
+     * closed set of attaching fragments is classified exactly as spec 1.3.1 classified it.
+     */
+    readonly elisionClitics: ElisionClitics;
   };
   readonly dash: {
     readonly parenthetical: "em-tight" | "em-spaced" | "en-tight" | "en-spaced" | "none";

@@ -23,7 +23,20 @@ const CONFIGS: ReadonlyArray<{ label: string; mode: Mode; dialect?: Dialect }> =
  * The alphabet is the spec's: the characters the rules consume *and* the ones they emit, since
  * idempotency is a statement about re-processing output.
  */
-const SWEEP_ALPHABET = ['"', "'", "-", " ", ".", "1", "a", "«", "–", "”"];
+// `s` and `l` are here for quotes.md 3.2's span-boundary elision veto (spec 1.4.0), under
+// pipeline-idempotency.md 6's standing obligation: a defect whose witness the committed bound
+// cannot reach means the bound is wrong, and the alphabet is widened in the same change that
+// fixes the defect. They are the two shipped fragments a marker-adjacent mark can carry — `s`
+// from en-*/nl's `after`, `l` from fr/fr-CA/it's `before` — so without them no sweep can fire
+// the veto at all. Measured, and both witnesses are INSIDE this sweep's own budget (MAX_LENGTH
+// bounds |A|+|B|+|C|, not the rendered string): `<em>a</em>'s` fires the `after` test in en-*/nl
+// and `l'<em>a</em>` the `before` test in fr/fr-CA/it. The widened sweep passes.
+//
+// Scope, so it is stated rather than assumed: this reaches the fragments `s` and `l` only. The
+// other shipped entries — pt-*'s `d n pel m t lh sant`, nl's `t ns k m em r et`, it's `un` and
+// `d` — are covered by fixtures, not by this sweep. pipeline-idempotency.md 6's obligation is
+// reachability of the FOUND defect's witness, not an exhaustive walk of locale data.
+const SWEEP_ALPHABET = ['"', "'", "-", " ", ".", "1", "a", "s", "l", "«", "–", "”"];
 const MAX_LENGTH = 3;
 
 /** `A<em>B</em>C` — the spec's own minimum template, with the alphabet distributed across A, B, C. */

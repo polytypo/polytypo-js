@@ -1,11 +1,20 @@
 import { toCodePoints } from "../engine/codepoints.js";
 import { isLetter } from "../engine/unicode.js";
 import { LINE_MARKER, MARKER, NONE } from "../engine/sentinels.js";
-import type { Edit, ElisionIdiom, LocaleData, QuotePair, Rule, RuleContext } from "../types.js";
+import type {
+  Edit,
+  ElisionClitics,
+  ElisionIdiom,
+  LocaleData,
+  QuotePair,
+  Rule,
+  RuleContext,
+} from "../types.js";
 import {
   NARROW,
   computeAmbiguousShapeIndices,
   computeIdiomMatchedIndices,
+  computeSpanBoundaryVetoIndices,
 } from "./quote-ambiguity.js";
 
 /**
@@ -192,10 +201,13 @@ function computeSkipSets(locale: LocaleData): SkipSets {
  * `nbsp` can reach it (the locale-derived `spaceRight`/`spaceLeft` sets), which is what keeps
  * every verdict inert to `nbsp` (Lemma B).
  */
+const EMPTY_VETO: ReadonlySet<number> = new Set();
+
 function collectCandidates(
   arr: readonly number[],
   skip: SkipSets,
   elisionIdioms: readonly ElisionIdiom[],
+  elisionClitics: ElisionClitics | undefined,
 ): Candidate[] {
   const n = arr.length;
   const candidates: Candidate[] = [];
@@ -204,14 +216,19 @@ function collectCandidates(
   // have the same intent — that `apostrophe` (order 50) convert the surviving marks by its own
   // case ladder. The union is computed rather than assumed: an idiom's `elided` field is not
   // required to be the single `n` the universal veto matches.
-  const idiomMatched = computeIdiomMatchedIndices(arr, elisionIdioms);
-  const ambiguousShape = computeAmbiguousShapeIndices(arr);
-  const elisionVetoed =
-    ambiguousShape.size === 0
-      ? idiomMatched
-      : idiomMatched.size === 0
-        ? ambiguousShape
-        : new Set([...idiomMatched, ...ambiguousShape]);
+  // spec 1.4.0 adds a third member to the same union: the span-boundary elision veto, which
+  // fires only where one literal neighbour is the inline MARKER (quotes.md 3.2).
+  const sets = [
+    computeIdiomMatchedIndices(arr, elisionIdioms),
+    computeAmbiguousShapeIndices(arr),
+    computeSpanBoundaryVetoIndices(arr, elisionClitics),
+  ].filter((set) => set.size > 0);
+  const elisionVetoed: ReadonlySet<number> =
+    sets.length === 0
+      ? EMPTY_VETO
+      : sets.length === 1
+        ? (sets[0] as ReadonlySet<number>)
+        : new Set(sets.flatMap((set) => [...set]));
 
   for (let i = 0; i < n; i += 1) {
     const g = at(arr, i);
@@ -475,7 +492,7 @@ function certify(
     const { y, map } = applyRenderPlan(arr, plan);
     const rederived = pairCandidates(
       y,
-      collectCandidates(y, skip, ctx.locale.quotes.elisionIdioms),
+      collectCandidates(y, skip, ctx.locale.quotes.elisionIdioms, ctx.locale.quotes.elisionClitics),
     );
     const bSet = new Set(rederived.map((p) => pairKey(p.open, p.close)));
 
@@ -549,7 +566,12 @@ export const quotesRule: Rule = {
     const cp = ctx.cp;
     const skip = computeSkipSets(ctx.locale);
 
-    const candidates = collectCandidates(cp, skip, ctx.locale.quotes.elisionIdioms);
+    const candidates = collectCandidates(
+      cp,
+      skip,
+      ctx.locale.quotes.elisionIdioms,
+      ctx.locale.quotes.elisionClitics,
+    );
     if (candidates.length === 0) return [];
 
     const initialPairs = pairCandidates(cp, candidates);

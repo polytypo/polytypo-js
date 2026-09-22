@@ -1,7 +1,7 @@
 import { toCodePoints } from "../engine/codepoints.js";
 import { isLetter } from "../engine/unicode.js";
-import { NONE } from "../engine/sentinels.js";
-import type { ElisionIdiom } from "../types.js";
+import { MARKER, NONE } from "../engine/sentinels.js";
+import type { ElisionClitics, ElisionIdiom } from "../types.js";
 
 /**
  * The structural predicates `quotes` (order 40) reads to decline a pairing — quotes.md 3.2.
@@ -18,6 +18,13 @@ import type { ElisionIdiom } from "../types.js";
  * `INLINE-SPACE` code point immediately outside each mark. It needs no citation because the
  * operator ruled the idiom international (quotes.md 3.2, 2026-09-09), and it vetoes a superset of
  * what the cited en-US entry does.
+ *
+ * {@link computeSpanBoundaryVetoIndices} is the span-boundary elision veto (spec 1.4.0): a
+ * `NARROW` mark whose literal left or right neighbour IS modes.md 3.2's inline boundary marker,
+ * with a cited `quotes.elisionClitics` fragment attaching on its other side. It exists because
+ * the two mechanisms above both need a real code point on each side, so a possessive or elision
+ * written flush against a span (`` `x`'s ``, `l'<em>idée</em>`) escaped both and was paired as a
+ * quotation, inverting the enclosing pair (canonical issue #53).
  *
  * Only `quotes` consumes this module. Spec 0.5.0 had `apostrophe` consume it too, through a
  * preserve set that stopped its case ladder from converting marks 0.5.0 wanted preserved;
@@ -195,4 +202,76 @@ export function computeAmbiguousShapeIndices(cp: readonly number[]): ReadonlySet
   }
 
   return ambiguous;
+}
+
+/**
+ * Span-boundary elision veto (quotes.md 3.2, spec 1.4.0), locale data `quotes.elisionClitics`.
+ *
+ * Fires only where one literal neighbour is the inline `MARKER`, which is why it is inert in
+ * `text` and `yaml` modes — neither produces one. The attaching side is read as a MAXIMAL
+ * `LETTER` run bounded by a non-`ALNUM` code point (or `NONE`) and compared whole: a prefix test
+ * would match the entry `s` inside `sure` and eat `<em>'sure'</em>`, a genuine quotation.
+ *
+ * The comparison folds the run's first code point, ASCII A-Z only, and is exact thereafter —
+ * the same convention the idiom matcher above uses, never a platform locale function
+ * (ARCHITECTURE.md 4.4). Entries are authored lowercase, enforced at the data boundary.
+ */
+export function computeSpanBoundaryVetoIndices(
+  arr: readonly number[],
+  clitics: ElisionClitics | undefined,
+): ReadonlySet<number> {
+  const vetoed = new Set<number>();
+  const before = clitics?.before ?? [];
+  const after = clitics?.after ?? [];
+  if (before.length === 0 && after.length === 0) return vetoed;
+
+  const compiled = {
+    before: before.map(toCodePoints),
+    after: after.map(toCodePoints),
+  };
+
+  for (let i = 0; i < arr.length; i += 1) {
+    if (!NARROW.has(at(arr, i))) continue;
+    if (at(arr, i - 1) === MARKER && runMatches(arr, i, 1, compiled.after)) {
+      vetoed.add(i);
+      continue;
+    }
+    if (at(arr, i + 1) === MARKER && runMatches(arr, i, -1, compiled.before)) {
+      vetoed.add(i);
+    }
+  }
+  return vetoed;
+}
+
+/**
+ * The maximal `LETTER` run adjacent to the mark at `i` in direction `dir`, compared against
+ * `entries`. Returns false for an empty run, for a run the caller's own `ALNUM` bound continues
+ * past (a digit directly beyond the letters is still a word character, so the run is not the
+ * whole fragment), and for a run no entry equals.
+ */
+function runMatches(
+  arr: readonly number[],
+  i: number,
+  dir: 1 | -1,
+  entries: readonly (readonly number[])[],
+): boolean {
+  const run: number[] = [];
+  let j = i + dir;
+  for (; ; j += dir) {
+    const cp = at(arr, j);
+    if (cp === NONE || !isLetter(cp)) break;
+    run.push(cp);
+  }
+  if (run.length === 0) return false;
+  const outer = at(arr, j);
+  if (outer !== NONE && isAlnum(outer)) return false;
+  if (dir === -1) run.reverse();
+
+  for (const entry of entries) {
+    if (entry.length !== run.length) continue;
+    let same = at(entry, 0) === asciiLower(at(run, 0));
+    for (let k = 1; same && k < entry.length; k += 1) same = at(entry, k) === at(run, k);
+    if (same) return true;
+  }
+  return false;
 }

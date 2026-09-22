@@ -124,6 +124,42 @@ function checkElisionIdioms(file, value) {
   });
 }
 
+// quotes.md 3.2's span-boundary elision veto (spec 1.4.0). Entries are compared against a
+// maximal LETTER run, so a non-LETTER code point is unmatchable by construction — dead data
+// rather than a rejected claim, which is why it is rejected here at the data boundary, exactly
+// as elisionIdioms' left/right are. An entry whose first code point is ASCII A-Z is rejected for
+// the same class of reason: the veto folds that code point down before comparing, so an entry
+// authored uppercase can never match anything.
+function checkElisionClitics(file, value) {
+  if (!isPlainObject(value)) fail(`${file}: quotes.elisionClitics must be an object`);
+  const out = {};
+  for (const side of ["before", "after"]) {
+    const list = value[side];
+    if (!Array.isArray(list)) fail(`${file}: quotes.elisionClitics.${side} must be an array`);
+    for (const entry of list) {
+      const path = `quotes.elisionClitics.${side}`;
+      if (typeof entry !== "string" || entry.length === 0) {
+        fail(`${file}: ${path} entries must be non-empty strings`);
+      }
+      if (!isAllLetters(entry)) {
+        fail(
+          `${file}: ${path} entry ${JSON.stringify(entry)} must consist entirely of LETTER ` +
+            `code points (quotes.md 3.2's span-boundary elision veto walks a LETTER run)`,
+        );
+      }
+      const first = entry.codePointAt(0);
+      if (first >= 0x41 && first <= 0x5a) {
+        fail(
+          `${file}: ${path} entry ${JSON.stringify(entry)} must be authored lowercase — the ` +
+            `veto folds the first code point ASCII A-Z down before comparing`,
+        );
+      }
+    }
+    out[side] = [...list];
+  }
+  return out;
+}
+
 function checkLocale(file, data) {
   for (const key of ["locale", "name", "quotes", "dash", "ellipsis", "hyphen", "nbsp", "sources"]) {
     if (!(key in data)) fail(`${file}: missing required field \`${key}\``);
@@ -133,6 +169,7 @@ function checkLocale(file, data) {
   }
   if (!isPlainObject(data.quotes)) fail(`${file}: \`quotes\` must be an object`);
   const elisionIdioms = checkElisionIdioms(file, data.quotes.elisionIdioms);
+  const elisionClitics = checkElisionClitics(file, data.quotes.elisionClitics);
   if (!isPlainObject(data.dash)) fail(`${file}: \`dash\` must be an object`);
   if (!PARENTHETICAL.includes(data.dash.parenthetical)) {
     fail(`${file}: dash.parenthetical must be one of ${PARENTHETICAL.join(", ")}`);
@@ -186,6 +223,7 @@ function checkLocale(file, data) {
       primary: checkQuotePair(file, "quotes.primary", data.quotes.primary),
       secondary: checkQuotePair(file, "quotes.secondary", data.quotes.secondary),
       elisionIdioms,
+      elisionClitics,
     },
     dash: { parenthetical: data.dash.parenthetical, range: data.dash.range },
     ellipsis: { abbreviatedAfterTerminal: data.ellipsis.abbreviatedAfterTerminal },
