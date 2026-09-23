@@ -1,6 +1,6 @@
 {
   "name": "polytypo",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Normalize typography across languages: locale-correct quotes, dashes, ellipses and no-break spaces.",
   "keywords": [
     "typography",
