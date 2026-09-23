@@ -253,6 +253,81 @@ describe("apostrophe — idempotency", () => {
   }
 });
 
+describe("apostrophe — case 2a, a closing delimiter on the left (spec 1.5.0)", () => {
+  it("converts after a closing bracket, brace or square bracket", () => {
+    expect(run("The pipeline (order 90)'s own output")).toBe(
+      `The pipeline (order 90)${RSQUO}s own output`,
+    );
+    expect(run("{user}'s account")).toBe(`{user}${RSQUO}s account`);
+    expect(run("the footnote [3]'s author")).toBe(`the footnote [3]${RSQUO}s author`);
+  });
+
+  it("converts after a closing quotation glyph, whichever one the locale closes with", () => {
+    // The asymmetry case 2a removes: U+00AB is an OPENISH member and reached case 4 before
+    // 1.5.0, while U+00BB and U+203A sat in CLOSEISH, which no left-hand test read.
+    expect(run(`${ch(0xbb)}Wort${ch(0xab)}'s`)).toBe(`${ch(0xbb)}Wort${ch(0xab)}${RSQUO}s`);
+    expect(run(`${ch(0xab)}Wort${ch(0xbb)}'s`)).toBe(`${ch(0xab)}Wort${ch(0xbb)}${RSQUO}s`);
+    expect(run(`${ch(0x2039)}Wort${ch(0x203a)}'s`)).toBe(
+      `${ch(0x2039)}Wort${ch(0x203a)}${RSQUO}s`,
+    );
+    expect(run(`${ch(0x201c)}Hamlet${ch(0x201d)}'s`)).toBe(
+      `${ch(0x201c)}Hamlet${ch(0x201d)}${RSQUO}s`,
+    );
+    // U+2019 is both this rule's only emission and a CLOSEDELIM member; the doubled glyph is
+    // the correct sequence for a possessive on a quoted term, and 5's mirrored vacuity
+    // argument is what says it is still a fixed point.
+    expect(run(`A ${LSQUO}quoted${RSQUO}'s meaning`)).toBe(
+      `A ${LSQUO}quoted${RSQUO}${RSQUO}s meaning`,
+    );
+  });
+
+  it("declines after CLOSEISH's sentence punctuation", () => {
+    for (const left of [",", ".", ";", ":", "!", "?", ch(0x2026)]) {
+      expect(run(`said${left}'yes`)).toBe(`said${left}'yes`);
+    }
+  });
+
+  it("declines after every symbol, which is issue #28's declined half (7 item 8)", () => {
+    for (const left of ["%", ch(0xb0), ch(0x2030), ch(0xb2), ch(0xb3), ch(0xb9), ch(0x2074)]) {
+      expect(run(`10${left}'u`)).toBe(`10${left}'u`);
+    }
+  });
+
+  it("leaves a prime on a function name alone — it is case 2a's ALNUM right-test that does it", () => {
+    // Not the case 1 prime guard, which reads DIGIT on the left only: U+0028 is in no
+    // right-hand class, so `f'(x)` and `f²'(x)` have nothing any converting case accepts.
+    expect(run("f'(x) = 2")).toBe("f'(x) = 2");
+    expect(run(`f${ch(0xb2)}'(x) = 4`)).toBe(`f${ch(0xb2)}'(x) = 4`);
+  });
+
+  it("is disjoint from every other case, so its ladder position carries no behaviour", () => {
+    // CLOSEDELIM intersects neither ALNUM (cases 1, 2, 3, 3a) nor OPENISH (case 4), so no input
+    // can match 2a and another case at once. Checked member by member rather than asserted.
+    const CLOSEDELIM = [0x29, 0x5d, 0x7d, 0xbb, 0x2019, 0x201d, 0x203a];
+    const OPENISH = [
+      0x28, 0x5b, 0x7b, 0xab, 0x2018, 0x201a, 0x201b, 0x201c, 0x201e, 0x201f, 0x2039, 0x2d,
+      0x2011, 0x2013, 0x2014,
+    ];
+    for (const cp of CLOSEDELIM) {
+      expect(OPENISH).not.toContain(cp);
+      expect(fromCodePoints([cp]).trim()).not.toMatch(/[\p{L}\p{N}]/u);
+    }
+  });
+
+  it("holds as a fixed point through the whole pipeline", () => {
+    const opts = { locale: "en-GB" } as const;
+    for (const input of [
+      "The report (2026)'s summary",
+      `A ${LSQUO}quoted${RSQUO}'s meaning`,
+      "{user}'s account",
+      "10%'u",
+    ]) {
+      const once = transform(input, opts);
+      expect(transform(once, opts)).toBe(once);
+    }
+  });
+});
+
 describe("apostrophe — the withdrawn preserve set (apostrophe.md §3.4, spec 1.1.0)", () => {
   it("apostropheRule alone converts both marks — it skips no position and reads no locale data", () => {
     // Spec 0.5.0 had this rule consult a shared preserve set so its case ladder would not curl

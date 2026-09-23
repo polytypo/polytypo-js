@@ -98,6 +98,15 @@ const OPENQUOTE: ReadonlySet<number> = new Set([
   0xab, 0x2018, 0x201a, 0x201b, 0x201c, 0x201e, 0x201f, 0x2039,
 ]);
 
+// spec 1.5.0: the bracket and quotation members of `CLOSEISH`, without its sentence punctuation
+// and without the dashes `OPENISH` already carries, for case 2a. These are exactly the closing
+// delimiters case 3 has always accepted on the mark's RIGHT; before 1.5.0 the left side accepted
+// none of them. No `MARKER` (modes.md 3.3): it is in `OPENISH`, so a mark against a span boundary
+// already reaches case 4 and emits the same U+2019.
+const CLOSEDELIM: ReadonlySet<number> = new Set([
+  0x29, 0x5d, 0x7d, 0xbb, 0x2019, 0x201d, 0x203a,
+]);
+
 /** Out-of-range reads yield `NONE`, the spec's own boundary value. */
 function at(cp: readonly number[], i: number): number {
   const value = cp[i];
@@ -121,6 +130,10 @@ function isApostrophe(left: number, right: number): boolean {
   if (isDigit(left) && !isLetter(right)) return false;
   // 2 — medial: `don't`, `l'été`, `O'Brien`, `1990's`.
   if (isAlnum(left) && isAlnum(right)) return true;
+  // 2a — suffix or possessive after a closing delimiter (spec 1.5.0): `(order 35)'s`,
+  // `` `nbsp` (R₈)'s ``, `”word”'s`, `{price}'den`. Disjoint from every other case, so its
+  // position in the ladder carries no behaviour.
+  if (CLOSEDELIM.has(left) && isAlnum(right)) return true;
   // 3 — trailing elision or possessive: `the dogs' bowls`, `Jesus'`.
   if (isLetter(left) && (right === NONE || SPACELIKE.has(right) || CLOSEISH.has(right)))
     return true;

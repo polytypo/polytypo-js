@@ -36,7 +36,12 @@ const CONFIGS: ReadonlyArray<{ label: string; mode: Mode; dialect?: Dialect }> =
 // other shipped entries — pt-*'s `d n pel m t lh sant`, nl's `t ns k m em r et`, it's `un` and
 // `d` — are covered by fixtures, not by this sweep. pipeline-idempotency.md 6's obligation is
 // reachability of the FOUND defect's witness, not an exhaustive walk of locale data.
-const SWEEP_ALPHABET = ['"', "'", "-", " ", ".", "1", "a", "s", "l", "«", "–", "”"];
+//
+// `)` is here for apostrophe.md 3.3's case 2a (spec 1.5.0), under the same standing obligation.
+// It is the one CLOSEDELIM member the alphabet did not already contain: `”` was in it as an
+// emitted quote glyph and covers the quotation half of the class, so `)'a` and `”'a` between them
+// fire both halves. Three characters, so the witness is inside this sweep's own budget.
+const SWEEP_ALPHABET = ['"', "'", "-", " ", ".", "1", "a", "s", "l", "«", "–", "”", ")"];
 const MAX_LENGTH = 3;
 
 /** `A<em>B</em>C` — the spec's own minimum template, with the alphabet distributed across A, B, C. */
