@@ -132,7 +132,14 @@ export interface LocaleData {
     readonly afterSymbols: readonly string[];
     readonly initialBinding: InitialBinding;
   };
-  readonly sources: readonly LocaleSource[];
+  /**
+   * Optional, and absent from this package's own embedded data: scripts/gen-locales.mjs
+   * validates the citations and then drops them, since no rule reads them and they are 94% of
+   * the locale payload. The field stays in the type because it is part of the spec's locale
+   * shape — spec/locales/*.json in the canonical repository carry it, and a caller assembling
+   * LocaleData from those files may too.
+   */
+  readonly sources?: readonly LocaleSource[];
 }
 
 export interface LocaleSource {

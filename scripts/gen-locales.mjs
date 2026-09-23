@@ -243,13 +243,18 @@ function checkLocale(file, data) {
       afterSymbols: data.nbsp.afterSymbols,
       initialBinding: data.nbsp.initialBinding,
     },
-    sources: data.sources.map((source) => {
-      const out = { rule: source.rule, cite: source.cite };
-      if (typeof source.url === "string") out.url = source.url;
-      if (typeof source.note === "string") out.note = source.note;
-      return out;
-    }),
   };
+  // `sources` is DELIBERATELY not emitted. It is validated above — a locale without a non-empty
+  // citation list fails this generator, exactly as before — and it is then dropped, because no
+  // rule reads it and it is 94% of the locale payload by raw bytes: 193 KB of the 206 KB, 65 KB
+  // gzipped, against 13 KB of everything the engine actually consults. Embedding it put that
+  // prose in every published artifact and in every browser that loads the bundle, where it is
+  // two thirds of the weight of the `text` entry.
+  //
+  // The citations have a home and it is not here: spec/locales/*.json in the canonical repo,
+  // rendered on the Locales page. The vendored copy under spec/ keeps them byte-for-byte; this
+  // is a projection applied when generating the embedded module, not a change to what is
+  // vendored (that model is an open decision — see the canonical CLAUDE.md).
 }
 
 const files = readdirSync(localesDir)

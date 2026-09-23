@@ -135,7 +135,14 @@ describe("locale data lookup", () => {
     const tag = available[0] as string;
     const data = getLocaleData(tag);
     expect(data.locale).toBe(tag);
-    expect(data.sources.length).toBeGreaterThan(0);
+    // `sources` is validated by scripts/gen-locales.mjs (a locale with no citation fails the
+    // generator) and by the canonical repo's own schema, which makes it required with
+    // minItems: 1 — so asserting its presence here was a third copy of the same check. What is
+    // worth pinning instead is its deliberate ABSENCE from the embedded data: 193 KB raw / 65 KB
+    // gzipped of citation prose no rule reads, which used to ship in every bundle.
+    expect(data.sources, "citations must not be re-embedded — see gen-locales.mjs").toBe(
+      undefined,
+    );
   });
 
   it("reports a registry locale with no generated data as malformed", () => {

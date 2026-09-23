@@ -1,25 +1,25 @@
 {
   "_meta": {
-    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured again for spec 1.4.0 on the same grounds: quotes.elisionClitics adds two short lists to eight locale files, and the citations backing them add prose to those files' `sources`, which is part of the public LocaleData type and therefore embedded. Growth is ~22 KB raw / ~5 KB gzip per entry, visible as +7% on `text` and `yaml` because those entries are almost nothing but data. No code path was added to any entry; scripts/check-entry-reach.mjs still proves the module graph independently. Worth a separate look some day: `sources` is citation prose no runtime reads, and it ships to every browser."
+    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured DOWNWARD for the 1.4.x line: gen-locales.mjs stopped embedding `sources`, which was 94% of the locale payload by raw bytes and no rule reads. text 88.7 -> 19.7 KB gzip, yaml 90.6 -> 21.6, html 137.9 -> 68.6, index and markdown 234.7 -> 165.5. The budget now guards a much smaller number, which is the point: re-embedding the citations would trip it immediately rather than hiding inside a quarter-megabyte of prose."
   },
   "index": {
-    "raw": 844934,
-    "gzip": 240322
+    "raw": 580174,
+    "gzip": 169504
   },
   "text": {
-    "raw": 327541,
-    "gzip": 90817
+    "raw": 62783,
+    "gzip": 20144
   },
   "html": {
-    "raw": 495248,
-    "gzip": 141189
+    "raw": 230490,
+    "gzip": 70211
   },
   "markdown": {
-    "raw": 840549,
-    "gzip": 239946
+    "raw": 575789,
+    "gzip": 169005
   },
   "yaml": {
-    "raw": 333100,
-    "gzip": 92782
+    "raw": 68342,
+    "gzip": 22100
   }
 }
