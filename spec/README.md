@@ -1,10 +1,12 @@
 # Vendored spec subset
 
-This directory is a manually-synced copy of the subset of `polytypo/polytypo`'s canonical `spec/`
-that this repository's build and test suite read at runtime: `locales/`, `fixtures/`,
-`rules/order.json`, `rules/dashes.md` (parsed by `tests/rules/dashes-doc-ownership.test.ts`),
-`VERSION`, `UNICODE`. It is **not** the canonical spec — the rest of the normative prose, the
-JSON Schemas, and `validate-spec.mjs` all live only in `polytypo/polytypo`.
+This directory is a manually-synced copy of a subset of `polytypo/polytypo`'s canonical `spec/`:
+`locales/`, `fixtures/`, the whole of `rules/`, `VERSION` and `UNICODE`. Code and tests here read
+only part of that — the locale and fixture data, `rules/order.json`, and `rules/dashes.md` (parsed
+by `tests/rules/dashes-doc-ownership.test.ts`); the other twelve rule documents are carried as the
+normative prose for the behaviour the data drives, next to the data. It is **not** the canonical
+spec: the JSON Schemas and `validate-spec.mjs` live only in `polytypo/polytypo`, and so does the
+authority — a change starts there and arrives here by re-copying, never the other way round.
 
 Editing a file here does not change the spec; it only drifts this copy from canonical. When
 canonical's `spec/` changes, re-copy the affected files here.
