@@ -91,6 +91,13 @@ jobs:
       - name: Verify the canonical spec tag exists
         run: node scripts/verify-spec-tag.mjs
 
+      # The step above proves the tag exists; this one proves the vendored tree equals it.
+      # CI on main runs the same check, but a tag can be pushed to a commit CI never saw,
+      # and this is the last point before a package is built from that tree
+      # (polytypo/polytypo#56).
+      - name: Verify the vendored spec matches that tag
+        run: sh scripts/check-vendored-spec.sh spec
+
       # Clean, reproducible install from the committed lockfile — never `npm install` here.
       - name: Install dependencies (npm ci)
         run: npm ci
