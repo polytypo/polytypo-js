@@ -91,3 +91,18 @@ jobs:
       # only (does not fail the build). See scripts/check-install-footprint.mjs.
       - name: Report npm install footprint
         run: npm run check:install-footprint
+
+  vendored-spec:
+    name: Vendored spec matches canonical
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The vendored spec subset in this repository is a manually synced copy of canonical
+      # polytypo's spec/. Its data half stays current because the test suite fails without it;
+      # nothing checked its rules/*.md half, and four published packages shipped rule
+      # documentation that contradicted their own engine (polytypo/polytypo#56). This compares
+      # every vendored file against canonical at the tag the vendored VERSION names, so a stale
+      # copy — or a released spec amended in place — fails here rather than reaching a package.
+      - name: Compare against canonical spec tag
+        run: sh scripts/check-vendored-spec.sh spec
