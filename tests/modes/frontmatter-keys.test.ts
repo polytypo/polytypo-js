@@ -38,7 +38,9 @@ describe("frontmatterKeys — what it processes (modes.md 3.7.4)", () => {
   });
 
   it("absent means the pre-1.7.0 skip, byte for byte", () => {
-    expect(md(DOC)).toBe('---\ntitle: He said "hello" once\nslug: "a - b"\n---\n\nBody “quotes”—here.\n');
+    expect(md(DOC)).toBe(
+      '---\ntitle: He said "hello" once\nslug: "a - b"\n---\n\nBody “quotes”—here.\n',
+    );
   });
 
   it("an empty list is legal and yields no spans", () => {
@@ -55,7 +57,9 @@ describe("frontmatterKeys — what it processes (modes.md 3.7.4)", () => {
 
   it("leaves a TOML block alone, with the option or without it", () => {
     const toml = '+++\ntitle = "a - b"\n+++\n\nBody - here.\n';
-    expect(md(toml, { frontmatterKeys: ["title"] })).toBe('+++\ntitle = "a - b"\n+++\n\nBody—here.\n');
+    expect(md(toml, { frontmatterKeys: ["title"] })).toBe(
+      '+++\ntitle = "a - b"\n+++\n\nBody—here.\n',
+    );
     expect(frontmatterSpans(toml, "commonmark", ["title"])).toEqual([]);
   });
 
@@ -70,13 +74,15 @@ describe("frontmatterKeys — what it processes (modes.md 3.7.4)", () => {
     const crlf = '---\r\ntitle: a "b"\r\n---\r\n\r\nBody\r\n';
     const spans = frontmatterSpans(crlf, "commonmark", ["title"]);
     expect(spans.map((s) => crlf.slice(s.start, s.end))).toEqual(['a "b"']);
-    expect(md(crlf, { frontmatterKeys: ["title"] })).toBe('---\r\ntitle: a “b”\r\n---\r\n\r\nBody\r\n');
+    expect(md(crlf, { frontmatterKeys: ["title"] })).toBe(
+      "---\r\ntitle: a “b”\r\n---\r\n\r\nBody\r\n",
+    );
   });
 
   it("applies to both dialects", () => {
     const doc = '---\ntitle: a "b"\n---\n\n<Callout>c "d"</Callout>\n';
     expect(md(doc, { dialect: "mdx", frontmatterKeys: ["title"] })).toBe(
-      '---\ntitle: a “b”\n---\n\n<Callout>c “d”</Callout>\n',
+      "---\ntitle: a “b”\n---\n\n<Callout>c “d”</Callout>\n",
     );
   });
 });
@@ -87,7 +93,7 @@ describe("frontmatterKeys — the block is its own text unit (modes.md 3.7.4)", 
     expect(md(doc, { frontmatterKeys: ["title"] })).toBe(doc);
     // The discriminator: as one unit those two marks do pair, which is what this rule refuses.
     expect(transform('title: He said "hello\n\nworld" she said\n', { locale: "en-US" })).toBe(
-      'title: He said “hello\n\nworld” she said\n',
+      "title: He said “hello\n\nworld” she said\n",
     );
   });
 
@@ -99,14 +105,16 @@ describe("frontmatterKeys — the block is its own text unit (modes.md 3.7.4)", 
       '---\ntitle: a\n---\nAbutting body "x" - y\n',
     ];
     const allKeys = ["title", "slug", "summary", "seo", "other"];
+    // The block's own length can change, so the body is located in each result rather than at one
+    // offset taken from the input.
+    const bodyOf = (s: string): string => s.slice(s.indexOf("\n---", 3) + "\n---".length);
     for (const doc of docs) {
-      const blockEnd = doc.indexOf("\n---", 3) + "\n---".length;
       for (const keys of [[], ["title"], allKeys]) {
         const out = md(doc, { frontmatterKeys: keys });
-        const bodyOf = (s: string): string => s.slice(s.indexOf("\n---", 3) + "\n---".length);
-        expect(bodyOf(out), `body of ${JSON.stringify(doc)} with keys ${JSON.stringify(keys)}`).toBe(
-          doc.slice(blockEnd) === "" ? "" : bodyOf(md(doc)),
-        );
+        expect(
+          bodyOf(out),
+          `body of ${JSON.stringify(doc)} with keys ${JSON.stringify(keys)}`,
+        ).toBe(bodyOf(md(doc)));
       }
     }
   });
@@ -181,7 +189,9 @@ describe("frontmatterKeys — analyze (analyze.md 6)", () => {
       frontmatterKeys: ["title"],
     } as Options);
     expect(changes.length).toBeGreaterThan(1);
-    expect(changes.map((c) => c.start)).toEqual([...changes.map((c) => c.start)].sort((a, b) => a - b));
+    expect(changes.map((c) => c.start)).toEqual(
+      [...changes.map((c) => c.start)].sort((a, b) => a - b),
+    );
     for (const change of changes) {
       expect(change.start).toBeGreaterThanOrEqual(0);
       expect(change.end).toBeLessThanOrEqual([...DOC].length);
