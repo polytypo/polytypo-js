@@ -1,10 +1,12 @@
-import { markdownSpans, resolveDialect } from "../modes/markdown.js";
-import type { Options } from "../types.js";
+import { frontmatterSpans, markdownSpans, resolveDialect } from "../modes/markdown.js";
+import type { Dialect, Options } from "../types.js";
 import { getLocaleData } from "./locale.js";
 import { resolveNarrowTarget } from "./narrow-target.js";
 import { planRules } from "./rule-runner.js";
-import { analyzeOverSpans, runOverSpans } from "./span-runner.js";
+import { resolveFrontmatterKeys } from "./yaml-keys.js";
+import { analyzeOverUnits, runOverUnits } from "./span-runner.js";
 import type { Change } from "./origin.js";
+import type { Span } from "../modes/spans.js";
 
 /**
  * `markdown` mode only. Imports the Micromark/MDX stack and `parse5` (via `../modes/markdown.js`
@@ -21,8 +23,24 @@ export function runMarkdownPipeline(input: string, options: Partial<Options>): s
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
   const dialect = resolveDialect(options.dialect);
-  const spans = markdownSpans(input, dialect);
-  return runOverSpans(input, spans, planned, locale, "markdown", narrowTarget);
+  const frontmatterKeys = resolveFrontmatterKeys(options.frontmatterKeys);
+  const units = unitsOf(input, dialect, frontmatterKeys);
+  return runOverUnits(input, units, planned, locale, "markdown", narrowTarget);
+}
+
+/**
+ * modes.md 3.7.4: the body, and — only when the caller named frontmatter keys — the frontmatter
+ * block as a second text unit. Without the option this is exactly the single unit every document
+ * had before spec 1.7.0, which is why no released output can move.
+ */
+function unitsOf(
+  input: string,
+  dialect: Dialect,
+  frontmatterKeys: readonly string[] | undefined,
+): Span[][] {
+  const body = markdownSpans(input, dialect);
+  if (frontmatterKeys === undefined) return [body];
+  return [frontmatterSpans(input, dialect, frontmatterKeys), body];
 }
 
 /** analyze.md §1, `markdown` mode. Dialect validation happens here exactly as it does for
@@ -33,9 +51,10 @@ export function analyzeMarkdownPipeline(input: string, options: Partial<Options>
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
   const dialect = resolveDialect(options.dialect);
-  return analyzeOverSpans(
+  const frontmatterKeys = resolveFrontmatterKeys(options.frontmatterKeys);
+  return analyzeOverUnits(
     input,
-    markdownSpans(input, dialect),
+    unitsOf(input, dialect, frontmatterKeys),
     planned,
     locale,
     "markdown",

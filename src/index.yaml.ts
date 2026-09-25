@@ -15,7 +15,7 @@ import type { Options } from "./types.js";
  * optional on the aggregate `Options` because the other three modes ignore it, and **required**
  * here, where the mode is fixed and the option always applies.
  */
-export type YamlOptions = Omit<Options, "mode" | "dialect" | "keys"> & {
+export type YamlOptions = Omit<Options, "mode" | "dialect" | "keys" | "frontmatterKeys"> & {
   /** Required here, with no default — modes.md §3.8.2. An empty list processes nothing. */
   readonly keys: readonly string[];
 };

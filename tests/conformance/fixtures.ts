@@ -42,6 +42,11 @@ export interface ConformanceCase {
    * processable keys exactly as a caller would; an empty list is legal and processes nothing).
    */
   readonly keys?: readonly string[] | undefined;
+  /**
+   * Optional and only meaningful when `mode` is `"markdown"` (modes.md 3.7.4, spec 1.7.0): the
+   * frontmatter keys the case opts into. Absent means the block is skipped whole.
+   */
+  readonly frontmatterKeys?: readonly string[] | undefined;
 }
 
 export interface ConformanceFile {
@@ -143,6 +148,22 @@ function parseDialect(value: unknown, mode: Mode, where: string): Dialect | unde
   return undefined;
 }
 
+/** modes.md 3.7.4: optional, and only meaningful when `mode` is `"markdown"`. */
+function parseFrontmatterKeys(
+  value: unknown,
+  mode: string,
+  where: string,
+): readonly string[] | undefined {
+  if (value === undefined) return undefined;
+  if (mode !== "markdown") {
+    throw new Error(`${where}: "frontmatterKeys" is only meaningful when "mode" is "markdown"`);
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${where}: "frontmatterKeys" must be a list of strings (modes.md 3.7.4)`);
+  }
+  return value.map((key, index) => requireString(key, `${where} "frontmatterKeys"[${index}]`));
+}
+
 function parseCase(raw: unknown, where: string): ConformanceCase {
   if (!isRecord(raw)) throw new Error(`${where}: expected an object`);
   const id = requireString(raw.id, `${where} "id"`);
@@ -166,6 +187,7 @@ function parseCase(raw: unknown, where: string): ConformanceCase {
     rules: parseRuleOverrides(raw.rules, where),
     narrowNbsp: parseNarrowNbsp(raw.narrowNbsp, where),
     keys: parseKeys(raw.keys, mode, where),
+    frontmatterKeys: parseFrontmatterKeys(raw.frontmatterKeys, mode, where),
   };
 }
 

@@ -33,6 +33,14 @@ export interface Options {
    */
   keys?: readonly string[];
   /**
+   * Optional, and only meaningful when `mode` is `"markdown"` (spec/rules/modes.md §3.7.4, spec
+   * 1.7.0). The keys in the document's YAML frontmatter block whose scalar values are
+   * processable, scanned by the same scan `yaml` mode uses. Absent means the block is skipped
+   * whole, as it was before 1.7.0; an empty list is legal and yields no spans. The block is its
+   * own text unit, so this option can never change a byte outside it.
+   */
+  frontmatterKeys?: readonly string[];
+  /**
    * Per-rule override, keyed by `RuleId`. For a default-on rule (every rule except `ranges`),
    * `false` disables it and `true` is a no-op. For `ranges` — off by default (spec 0.5.0) —
    * `true` explicitly opts in and `false` (or omitting the key) leaves it disabled. Absence of a

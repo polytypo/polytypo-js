@@ -31,7 +31,13 @@ function optionsFor(locale: string, testCase: ConformanceCase): Options {
     testCase.narrowNbsp === undefined
       ? withRules
       : { ...withRules, narrowNbsp: testCase.narrowNbsp };
-  return testCase.keys === undefined ? withNarrow : { ...withNarrow, keys: testCase.keys };
+  const withKeys =
+    testCase.keys === undefined ? withNarrow : { ...withNarrow, keys: testCase.keys };
+  // Same reasoning for `frontmatterKeys` (spec 1.7.0): a case carrying it is a fixed point under
+  // it, and re-running without it would compare the block against a run that never saw it.
+  return testCase.frontmatterKeys === undefined
+    ? withKeys
+    : { ...withKeys, frontmatterKeys: testCase.frontmatterKeys };
 }
 
 function assertThrowsCode(label: string, code: string, run: () => string): void {

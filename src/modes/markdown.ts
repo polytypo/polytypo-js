@@ -6,6 +6,7 @@ import type { Event, Extension } from "micromark-util-types";
 import { PolytypoError } from "../errors.js";
 import type { Dialect } from "../types.js";
 import { htmlFragmentSpans, isSkippedElement } from "./html.js";
+import { yamlSpans } from "./yaml.js";
 import { wrapParserErrors } from "./parse-error.js";
 import type { Span } from "./spans.js";
 
@@ -42,7 +43,14 @@ const SKIPPED_TOKEN_TYPES: ReadonlySet<string> = new Set([
   // front of the colon of a machine-read metadata field. Covered by conformance fixtures
   // en-us-markdown-{commonmark,mdx}-frontmatter, fr-markdown-{commonmark,mdx}-frontmatter-nbsp,
   // en-us-markdown-commonmark-frontmatter-toml and -frontmatter-unterminated.
-  "frontmatter",
+  //
+  // These are `micromark-extension-frontmatter`'s own token types, one per matter. An earlier
+  // revision listed `"frontmatter"`, which the extension never emits: the block was skipped only
+  // because its content arrives as `yamlValue`/`tomlValue` rather than `data`, so the entry that
+  // was supposed to do the work did none. Naming the real types makes the skip explicit, and
+  // spec 1.7.0's `frontmatterKeys` needs the block recognised rather than merely un-emitted.
+  "yaml",
+  "toml",
 ]);
 
 /** Token types whose enter/exit also maintains the skipped-element stack. */
@@ -208,4 +216,60 @@ export function markdownSpans(source: string, dialect: Dialect): Span[] {
   }
 
   return spans;
+}
+
+/**
+ * modes.md 3.7.4, spec 1.7.0. The frontmatter block's own spans, which form a **second text
+ * unit**: the pipeline runs over them separately from the body's, so an unbalanced mark in a
+ * metadata field can never pair with one in the first paragraph and this option cannot change a
+ * byte outside the block.
+ *
+ * Spans are taken by the scan of modes.md 3.8 — frontmatter *is* YAML, and specifying it twice is
+ * how two implementations of one grammar drift — with `frontmatterKeys` as step 8's key predicate.
+ * The block itself is the construct `markdownSpans` skips (3.7.3), so the option can only ever add
+ * spans where the skip removed them: no source position belongs to both units, whatever a given
+ * parser's frontmatter support decides the construct's edges are (recorded in 3.7.4 and §7.13).
+ *
+ * A TOML block yields nothing, with the option or without it: TOML's quoting is a second grammar
+ * this scan does not claim (modes.md §7.13).
+ */
+export function frontmatterSpans(
+  source: string,
+  dialect: Dialect,
+  frontmatterKeys: readonly string[],
+): Span[] {
+  if (frontmatterKeys.length === 0) return [];
+  const events = wrapParserErrors(dialect, () => tokenize(source, extensionsFor(dialect)));
+
+  // 3.7.4: the content runs from after the opening delimiter line's terminator to the code point
+  // that begins the closing delimiter line, and both delimiters stay outside every span. Taken
+  // from the fence tokens rather than by searching the text, so a CRLF document, a trailing space
+  // on either delimiter and a `---` inside a scalar all behave without a second rule each.
+  let inBlock = false;
+  let contentStart = -1;
+  let contentEnd = -1;
+  for (const [kind, token] of events) {
+    const type = token.type as string;
+    if (type === "toml") return []; // a second grammar this scan does not claim (§7.13)
+    if (type === "yaml") {
+      if (kind === "enter") {
+        inBlock = true;
+        continue;
+      }
+      break;
+    }
+    if (!inBlock) continue;
+    if (kind !== "enter") continue;
+    if (type === "yamlFence") {
+      if (contentStart >= 0) contentEnd = token.start.offset;
+      continue;
+    }
+    if (type === "lineEnding" && contentStart < 0) contentStart = token.end.offset;
+  }
+  if (contentStart < 0 || contentEnd < contentStart) return [];
+
+  return yamlSpans(source.slice(contentStart, contentEnd), frontmatterKeys).map((span) => ({
+    start: span.start + contentStart,
+    end: span.end + contentStart,
+  }));
 }

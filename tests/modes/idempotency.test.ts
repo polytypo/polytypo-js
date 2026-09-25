@@ -161,6 +161,52 @@ describe.skipIf(!hasLocales)("bounded exhaustive idempotency sweep, yaml mode", 
   }
 });
 
+/**
+ * modes.md 5, spec 1.7.0: the `markdown` sweep must also carry a template with a frontmatter
+ * block and `frontmatterKeys` naming a key in it. Such a document has **two text units** (3.1),
+ * a composition no single-unit template reaches: the pipeline runs twice and the two edit sets
+ * are merged into one emission, so a mistake there shows up as a document that is not a fixed
+ * point even though each unit is.
+ *
+ * The block's own content reuses the yaml alphabet, since the scan inside it is 3.8's.
+ */
+const FRONTMATTER_TEMPLATES: ReadonlyArray<{
+  label: string;
+  of: (a: string, b: string, c: string) => string;
+}> = [
+  { label: "plain scalar and body", of: (a, b, c) => `---\nk: ${a}${b}\n---\n\n${c}\n` },
+  { label: "two scalars", of: (a, b, c) => `---\nk: ${a}\nj: ${b}\n---\n\n${c}\n` },
+  {
+    label: "block scalar and body",
+    of: (a, b, c) => `---\nk: |\n  ${a}\n  ${b}\n---\n\nbody ${c} end\n`,
+  },
+];
+
+describe.skipIf(!hasLocales)("bounded exhaustive idempotency sweep, markdown frontmatter", () => {
+  for (const tpl of FRONTMATTER_TEMPLATES) {
+    for (const locale of locales) {
+      it(`every ${tpl.label} document up to ${MAX_LENGTH} swept characters is idempotent in ${locale}`, () => {
+        const options: Options = {
+          locale,
+          mode: "markdown",
+          dialect: "commonmark",
+          frontmatterKeys: ["k", "j"],
+        };
+        const broken: string[] = [];
+        for (const [a, b, c] of yamlSplits()) {
+          const input = tpl.of(a, b, c);
+          const once = transform(input, options);
+          if (transform(once, options) !== once) {
+            broken.push(JSON.stringify(input));
+            if (broken.length >= 10) break;
+          }
+        }
+        expect(broken, `first non-idempotent ${tpl.label} inputs in ${locale}`).toEqual([]);
+      });
+    }
+  }
+});
+
 describe.skipIf(!hasLocales)("idempotency over generated documents", () => {
   const DOCUMENT_PARTS = [
     '<p class="x">',

@@ -13,7 +13,7 @@ import type { Options } from "./types.js";
  * likewise absent — it has no effect in `text` mode even in the aggregate entry (types.ts), so
  * there is nothing for it to conflict with here.
  */
-export type TextOptions = Omit<Options, "mode" | "dialect">;
+export type TextOptions = Omit<Options, "mode" | "dialect" | "frontmatterKeys">;
 
 export function transform(input: string, options: TextOptions): string {
   const given = (options ?? {}) as Partial<Options>;
