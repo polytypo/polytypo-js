@@ -32,6 +32,11 @@ export function runMarkdownPipeline(input: string, options: Partial<Options>): s
  * modes.md 3.7.4: the body, and — only when the caller named frontmatter keys — the frontmatter
  * block as a second text unit. Without the option this is exactly the single unit every document
  * had before spec 1.7.0, which is why no released output can move.
+ *
+ * The two units must be **disjoint** — 3.7.4: "no source position can belong to both units". Since
+ * spec 1.8.0 that is 3.7.3a's masking rule doing the work rather than a shared parser: the body is
+ * read from a document whose block is blanked out, so it cannot emit a span the frontmatter unit
+ * also claims, whatever the parser would have made of the block's characters.
  */
 function unitsOf(
   input: string,
@@ -40,7 +45,7 @@ function unitsOf(
 ): Span[][] {
   const body = markdownSpans(input, dialect);
   if (frontmatterKeys === undefined) return [body];
-  return [frontmatterSpans(input, dialect, frontmatterKeys), body];
+  return [frontmatterSpans(input, frontmatterKeys), body];
 }
 
 /** analyze.md §1, `markdown` mode. Dialect validation happens here exactly as it does for
