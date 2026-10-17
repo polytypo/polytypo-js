@@ -295,30 +295,31 @@ function blockScalar(
 }
 
 /**
- * 3.8.6. The span is the content between the quotes. Both bails exist so that source characters
- * and content characters are the same thing, which the offset model of 3.1 requires — the same
- * constraint that makes an HTML character reference an opaque unit in 3.6. No colon test applies
- * here: quoting neutralises the colon, and applying the plain-scalar test would decline
- * `title: "Chapter 1: the beginning"`.
+ * 3.8.6. The span is the content between the quotes. A double-quoted scalar containing a backslash
+ * yields no spans: the source spells that content with more characters than it has, which the
+ * offset model of 3.1 cannot hold — the same constraint that makes an HTML character reference an
+ * opaque unit in 3.6. In a single-quoted scalar `''` is the same kind of construct, and since spec
+ * 1.9.0 it is such a unit: the range is split around it, so the apostrophe it spells stays
+ * U+0027 and everything on either side converts. No colon test applies here: quoting neutralises
+ * the colon, and applying the plain-scalar test would decline `title: "Chapter 1: the beginning"`.
  */
 function quotedScalar(source: string, line: Line, v: number, spans: Span[]): void {
   const quote = source.charCodeAt(v);
+  const found: Span[] = [];
   let close = -1;
+  let segment = v + 1;
   for (let j = v + 1; j < line.end; j += 1) {
     const c = source.charCodeAt(j);
     if (quote === DQUOTE && c === BACKSLASH) return;
-    if (
-      quote === SQUOTE &&
-      c === SQUOTE &&
-      j + 1 < line.end &&
-      source.charCodeAt(j + 1) === SQUOTE
-    ) {
-      return;
+    if (c !== quote) continue;
+    if (quote === SQUOTE && j + 1 < line.end && source.charCodeAt(j + 1) === SQUOTE) {
+      if (j > segment) found.push({ start: segment, end: j });
+      segment = j + 2;
+      j += 1;
+      continue;
     }
-    if (c === quote) {
-      close = j;
-      break;
-    }
+    close = j;
+    break;
   }
   if (close < 0) return;
 
@@ -326,7 +327,8 @@ function quotedScalar(source: string, line: Line, v: number, spans: Span[]): voi
   while (after < line.end && source.charCodeAt(after) === SPACE) after += 1;
   if (after < line.end && source.charCodeAt(after) !== HASH) return;
 
-  if (close > v + 1) spans.push({ start: v + 1, end: close });
+  if (close > segment) found.push({ start: segment, end: close });
+  spans.push(...found);
 }
 
 /**

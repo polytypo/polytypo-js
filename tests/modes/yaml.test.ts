@@ -136,7 +136,7 @@ describe("yaml scan: skip by default (spec/rules/modes.md 3.8.3)", () => {
     ["an alias", "a: *anchor\n"],
     ["a tag", "a: !!str one two...\n"],
     ["a double-quoted scalar with an escape", 'a: "one \\"two\\"... three"\n'],
-    ["a single-quoted scalar with an escaped quote", "a: 'it''s one two...'\n"],
+    ["a single-quoted scalar left open after a doubled quote", "a: 'it''s one two...\n"],
     ["a tab anywhere on the line", "a:\tone two...\n"],
     ["a compact nested sequence", "a: - one two...\n"],
     ["a compact nested mapping", "a: one two .:\n"],
@@ -155,6 +155,31 @@ describe("yaml scan: skip by default (spec/rules/modes.md 3.8.3)", () => {
     const source = "{{ not yaml at all ... }}\n\t\tmixed\tindentation\n";
     expect(() => yaml(source)).not.toThrow();
     expect(yaml(source)).toBe(source);
+  });
+});
+
+describe("yaml single-quoted scalars split at '' (spec/rules/modes.md 3.8.6, spec 1.9.0)", () => {
+  it("splits the range around each doubled quote and leaves the unit outside every span", () => {
+    expect(spanText("a: 'it''s one two...'\n")).toEqual(["it", "s one two..."]);
+    expect(spanText("a: 'x''y''z'\n")).toEqual(["x", "y", "z"]);
+  });
+
+  it("claims a unit directly after the opening quote and directly before the closing one", () => {
+    expect(spanText("a: '''one two'''\n")).toEqual(["one two"]);
+  });
+
+  it("yields no span for a scalar that is nothing but one unit", () => {
+    expect(spanText("a: ''''\n")).toEqual([]);
+    expect(yaml("a: ''''\n")).toBe("a: ''''\n");
+  });
+
+  it("still closes on a lone quote and honours a trailing comment", () => {
+    expect(spanText("a: ''\n")).toEqual([]);
+    expect(spanText("a: 'it''s one' # it''s\n")).toEqual(["it", "s one"]);
+  });
+
+  it("converts around the unit and keeps the apostrophe straight", () => {
+    expect(yaml("a: 'it''s one...two'\n", "en-US")).toBe("a: 'it''s one…two'\n");
   });
 });
 
