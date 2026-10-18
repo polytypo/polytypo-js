@@ -183,6 +183,37 @@ describe("yaml single-quoted scalars split at '' (spec/rules/modes.md 3.8.6, spe
   });
 });
 
+describe("yaml lone U+000D (spec/rules/modes.md 3.8.4 step 9, 3.8.5, spec 1.10.0)", () => {
+  const unchanged: ReadonlyArray<readonly [string, string]> = [
+    ["a plain scalar", "title: a\rb -- c\n"],
+    ["a double-quoted scalar", 'title: "a\rb -- c"\n'],
+    ["a comment-shaped tail", "title: a\r#c -- d\n"],
+    ["two trailing carriage returns", "title: a -- b\r\r"],
+    ["two carriage returns before a line feed", "title: a -- b\r\r\n"],
+    ["any line of a block scalar", "title: |\n  a -- b\n  c\rd -- e\n"],
+    ["a value run, which stays consumed", "summary: a\rb\n  title: c -- d\n"],
+  ];
+  for (const [name, source] of unchanged) {
+    it(`yields no spans for ${name}, and returns it byte for byte`, () => {
+      expect(spanText(source, ["title", "summary"]), name).toEqual([]);
+      expect(yaml(source, "en-US", ["title", "summary"]), name).toBe(source);
+    });
+  }
+
+  it("still treats CRLF and a final bare U+000D as terminators", () => {
+    expect(yaml("title: a -- b\r\nslug: c -- d\r\n", "en-US", ["title", "slug"])).toBe(
+      "title: a—b\r\nslug: c—d\r\n",
+    );
+    expect(yaml("title: a -- b\r", "en-US", ["title"])).toBe("title: a—b\r");
+  });
+
+  it("does not count a line holding U+000D as blank", () => {
+    expect(yaml("title: |\n  a -- b\n\r  \n  c -- d\n", "en-US", ["title"])).toBe(
+      "title: |\n  a—b\n\r  \n  c -- d\n",
+    );
+  });
+});
+
 describe("yaml block scalars (spec/rules/modes.md 3.8.5)", () => {
   it("gives every chomping indicator identical spans and identical trailing bytes", () => {
     for (const header of ["|", "|-", "|+", ">", ">-", ">+"]) {

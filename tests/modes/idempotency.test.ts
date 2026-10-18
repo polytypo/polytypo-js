@@ -107,7 +107,7 @@ describe.skipIf(!hasLocales)("bounded exhaustive idempotency sweep across span b
  * characters whose adjacency to an emitted U+0020 the span-stability argument turns on — and
  * putting them in the shared alphabet would grow every other config's sweep for nothing.
  */
-const YAML_SWEEP_ALPHABET = ['"', "'", "-", ":", "#", " ", ".", "a", "–", "”"];
+const YAML_SWEEP_ALPHABET = ['"', "'", "-", ":", "#", " ", ".", "a", "–", "”", "\r"];
 
 /** A block scalar puts a line marker between every pair of spans; a plain scalar exercises the
  * `:`/`#` split, which puts an inline marker between them instead. */

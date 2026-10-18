@@ -89,6 +89,16 @@ function hasTab(source: string, line: Line): boolean {
 }
 
 /**
+ * 3.8.4 step 9. A U+000D that splitLines did not take for a terminator is a lone one, and YAML
+ * 1.2.2 5.4 reads it as a line break the LF-only model of 3.8.4 does not. Declining the line is
+ * what keeps "line terminators are never inside a span" true.
+ */
+function hasLoneCarriageReturn(source: string, line: Line): boolean {
+  for (let i = line.start; i < line.end; i += 1) if (source.charCodeAt(i) === CR) return true;
+  return false;
+}
+
+/**
  * 3.8.4 step 3. `---` and `...` at the head of a line, bare or introducing a node: the
  * trailing-content form is declined too, so `--- key: value` never yields a key of `--- key`.
  */
@@ -207,6 +217,9 @@ function scanLine(
   // nothing to decline: this is what makes `run:`, `if:` and `image:` unreachable.
   if (!listed.has(source.slice(keyStart, keyEnd))) return next;
 
+  // step 9 — a line carrying a lone U+000D yields no spans, but its value run is still consumed.
+  if (hasLoneCarriageReturn(source, line)) return next;
+
   // step 9 — the scalar form.
   const value = source.charCodeAt(v);
   if (
@@ -276,7 +289,7 @@ function blockScalar(
   for (let k = li + 1; k < runEnd; k += 1) {
     const next = lines[k] as Line;
     if (isBlank(source, next)) continue; // blank lines belong to the block and yield no span
-    if (hasTab(source, next)) return;
+    if (hasTab(source, next) || hasLoneCarriageReturn(source, next)) return;
     const nextIndent = firstNonSpace(source, next) - next.start;
     if (contentIndent < 0) {
       contentIndent = explicitIndent > 0 ? indent + explicitIndent : nextIndent;
