@@ -208,7 +208,8 @@ describe("ranges — G4 run lengths, spec ranges.md §3.2 (cases 3a-3j)", () => 
         continue;
       }
       const glyph = dash === "em-tight" || dash === "em-spaced" ? EM : EN;
-      const bound = dash === "em-spaced" || dash === "en-spaced" ? glyph : `${WJ}${glyph}${WJ}`;
+      const bound =
+        dash === "em-spaced" || dash === "en-spaced" ? ` ${glyph} ` : `${WJ}${glyph}${WJ}`;
       const once = transform("Takes 5-10 days", opts);
       expect(once).toBe(`Takes 5${bound}10 days`);
       expect(transform(once, opts)).toBe(once);
@@ -240,7 +241,8 @@ describe("ranges — joiner transparency, spec cases 45-47 (ranges.md §3.1, das
   it("45./47. an emitted joiner is transparent to a neighbouring token's G2", () => {
     for (const tag of Object.keys(LOCALES)) {
       const style = localeOf(tag).dash.range;
-      if (style === "none") continue;
+      // A spaced range form emits no joiner, and T1 declines a range beside a spaced dash.
+      if (style === "none" || style.endsWith("-spaced")) continue;
       const glyph = style === "em-tight" || style === "em-spaced" ? EM : EN;
       const once = run("1-1 - 1", localeOf(tag));
       expect(once).toBe(`1${WJ}${glyph}${WJ}1 - 1`);
@@ -254,6 +256,12 @@ describe("ranges — joiner transparency, spec cases 45-47 (ranges.md §3.1, das
       const range = localeOf(tag).dash.range;
       const target = range === "em-tight" || range === "em-spaced" ? EM : EN;
       const bound = `1${WJ}${target}${WJ}1 - 1`;
+      if (range.endsWith("-spaced")) {
+        // T1 declines a range beside a spaced dash, so neither input changes.
+        expect(run(`1${EN}1 - 1`, localeOf(tag)), `${tag} EN`).toBe(`1${EN}1 - 1`);
+        expect(run(`1${EM}1 - 1`, localeOf(tag)), `${tag} EM`).toBe(`1${EM}1 - 1`);
+        continue;
+      }
 
       expect(run(`1${EN}1 - 1`, localeOf(tag)), `${tag} EN`).toBe(
         range === "none" || target === EN ? `1${EN}1 - 1` : bound,

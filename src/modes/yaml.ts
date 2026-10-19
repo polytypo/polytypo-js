@@ -38,6 +38,7 @@ const ZERO = 0x30;
 const ONE = 0x31;
 const NINE = 0x39;
 const COLON = 0x3a;
+const QUESTION = 0x3f;
 const GREATER = 0x3e;
 const LBRACKET = 0x5b;
 const BACKSLASH = 0x5c;
@@ -139,13 +140,104 @@ function valueRunEnd(source: string, lines: readonly Line[], li: number, indent:
   return k;
 }
 
+/** 3.8.4 step 7: a line of the value run that is not blank. Blank lines alone are not one. */
+function hasContinuation(
+  source: string,
+  lines: readonly Line[],
+  li: number,
+  runEnd: number,
+): boolean {
+  for (let k = li + 1; k < runEnd; k += 1) if (!isBlank(source, lines[k] as Line)) return true;
+  return false;
+}
+
+/**
+ * 3.8.4's carriage-return region: a line containing a U+000D yields no spans, and neither does any
+ * later line up to the first one that is non-empty, does not begin with U+0020 and contains none.
+ * It removes spans and never adds one, so it cannot change which lines a value run consumes.
+ */
+function dropCarriageReturnRegions(source: string, lines: readonly Line[], spans: Span[]): Span[] {
+  const declined: boolean[] = [];
+  let inRegion = false;
+  for (const line of lines) {
+    if (hasLoneCarriageReturn(source, line)) inRegion = true;
+    else if (line.end > line.start && source.charCodeAt(line.start) !== SPACE) inRegion = false;
+    declined.push(inRegion);
+  }
+  if (!declined.includes(true)) return spans;
+  const kept: Span[] = [];
+  let li = 0;
+  for (const span of spans) {
+    while (li + 1 < lines.length && span.start >= (lines[li + 1] as Line).start) li += 1;
+    if (!declined[li]) kept.push(span);
+  }
+  return kept;
+}
+
 export function yamlSpans(source: string, keys: readonly string[]): Span[] {
   const listed = new Set(keys);
   const lines = splitLines(source);
   const spans: Span[] = [];
   let li = 0;
   while (li < lines.length) li = scanLine(source, lines, li, listed, spans);
-  return spans;
+  return dropCarriageReturnRegions(source, lines, spans);
+}
+
+/**
+ * 3.8.4 step 5. The index of the quote that closes the one at `q`, or -1. In a double-quoted scalar
+ * a U+005C and the code point after it never close the quote, which decodes nothing: no YAML
+ * escape ends in anything that would be a closing quote. A quote not closed on the line returns -1.
+ */
+function closingQuote(source: string, line: Line, q: number): number {
+  const quote = source.charCodeAt(q);
+  for (let j = q + 1; j < line.end; j += 1) {
+    const c = source.charCodeAt(j);
+    if (quote === DQUOTE && c === BACKSLASH) {
+      j += 1;
+      continue;
+    }
+    if (c !== quote) continue;
+    if (quote === SQUOTE && j + 1 < line.end && source.charCodeAt(j + 1) === SQUOTE) {
+      j += 1;
+      continue;
+    }
+    return j;
+  }
+  return -1;
+}
+
+/** 3.8.4 step 3. A document marker at column 0, which is where YAML reads one. */
+function documentRunEnd(source: string, lines: readonly Line[], li: number): number {
+  let k = li + 1;
+  while (k < lines.length) {
+    const next = lines[k] as Line;
+    if (isDocumentMarker(source, next.start, next.end)) break;
+    k += 1;
+  }
+  return k;
+}
+
+/**
+ * 3.8.4 step 5, the own-line node: everything up to the first later line that is non-empty and
+ * does not begin with U+0020, because the scan does not track the key above and a flow collection,
+ * a block scalar header or an unclosed quote on a line of its own can continue at any depth.
+ */
+function ownLineRunEnd(source: string, lines: readonly Line[], li: number, indent: number): number {
+  if (indent === 0) return documentRunEnd(source, lines, li);
+  let k = li + 1;
+  while (k < lines.length) {
+    const next = lines[k] as Line;
+    if (next.end > next.start && source.charCodeAt(next.start) !== SPACE) break;
+    k += 1;
+  }
+  return k;
+}
+
+/** 3.8.4 step 4: `-`, `?` or `:` followed by U+0020 or the line end. */
+function isNodeMarker(source: string, j: number, end: number): boolean {
+  const c = source.charCodeAt(j);
+  if (c !== DASH && c !== QUESTION && c !== COLON) return false;
+  return j + 1 === end || source.charCodeAt(j + 1) === SPACE;
 }
 
 /** One step of 3.8.4. Returns the index of the next line to scan. */
@@ -159,69 +251,133 @@ function scanLine(
   const line = lines[li] as Line;
   const skipLine = li + 1;
 
-  // step 1 — blank, or a tab anywhere, which makes indentation undecidable.
+  // step 1 — blank. A tab makes indentation undecidable, so the line and whatever it absorbs
+  // yield no spans, but steps 2 to 7 still decide what it absorbs.
   const start = firstNonSpace(source, line);
-  if (start === line.end || hasTab(source, line)) return skipLine;
+  if (start === line.end) return skipLine;
+  const isQuiet = hasTab(source, line);
   const indent = start - line.start;
 
-  // steps 2 and 3 — comment, directive, document marker.
+  // steps 2 and 3 — comment, directive, document marker. A marker with a node after it absorbs
+  // the document.
   const head = source.charCodeAt(start);
   if (head === HASH || head === PERCENT) return skipLine;
-  if (isDocumentMarker(source, start, line.end)) return skipLine;
+  if (isDocumentMarker(source, start, line.end)) {
+    let p = start + 3;
+    while (p < line.end && source.charCodeAt(p) === SPACE) p += 1;
+    if (p >= line.end || source.charCodeAt(p) === HASH) return skipLine;
+    return indent === 0 ? documentRunEnd(source, lines, li) : skipLine;
+  }
 
-  // step 4 — block sequence entries are consumed, not skipped; `- - key: v` nests.
+  // step 4 — node markers are consumed, not skipped; `- - key: v` nests.
   let i = start;
-  while (i < line.end && isSequenceDash(source, i, line.end)) {
+  while (i < line.end && isNodeMarker(source, i, line.end)) {
     i += 2;
     while (i < line.end && source.charCodeAt(i) === SPACE) i += 1;
   }
-  if (i >= line.end) return skipLine;
+  if (i >= line.end || source.charCodeAt(i) === HASH) return skipLine;
+  const hasMarker = i > start;
 
   // step 5 — find the key. A colon NOT followed by U+0020 or the line end is an ordinary key
   // character, so `a:b: v` has the key `a:b`; stating that is what keeps five scanners agreeing.
   const keyStart = i;
+  const first = source.charCodeAt(i);
   let colon = -1;
-  for (let j = i; j < line.end; j += 1) {
-    const c = source.charCodeAt(j);
-    if (
-      c === DQUOTE ||
-      c === SQUOTE ||
-      c === LBRACE ||
-      c === LBRACKET ||
-      c === AMPERSAND ||
-      c === STAR ||
-      c === BANG ||
-      c === HASH
-    ) {
-      return skipLine;
+  let keyEnd = -1;
+  let isDeclined = false;
+  let isOpenQuote = false;
+  if (first === DQUOTE || first === SQUOTE) {
+    const close = closingQuote(source, line, i);
+    if (close < 0) isOpenQuote = true;
+    else {
+      let p = close + 1;
+      while (p < line.end && source.charCodeAt(p) === SPACE) p += 1;
+      if (isIndicatorColon(source, p, line.end)) {
+        colon = p;
+        keyEnd = close + 1;
+        isDeclined = true;
+      }
     }
-    if (isIndicatorColon(source, j, line.end)) {
-      colon = j;
-      break;
+  } else if (
+    first !== LBRACE &&
+    first !== LBRACKET &&
+    first !== AMPERSAND &&
+    first !== STAR &&
+    first !== BANG
+  ) {
+    for (let j = i; j < line.end; j += 1) {
+      const c = source.charCodeAt(j);
+      if (c === HASH && source.charCodeAt(j - 1) === SPACE) break;
+      if (isIndicatorColon(source, j, line.end)) {
+        colon = j;
+        break;
+      }
+      if (
+        c === DQUOTE ||
+        c === SQUOTE ||
+        c === LBRACE ||
+        c === LBRACKET ||
+        c === AMPERSAND ||
+        c === STAR ||
+        c === BANG ||
+        c === HASH
+      ) {
+        isDeclined = true;
+      }
+    }
+    if (colon >= 0) {
+      keyEnd = colon;
+      while (keyEnd > keyStart && source.charCodeAt(keyEnd - 1) === SPACE) keyEnd -= 1;
     }
   }
-  if (colon < 0) return skipLine;
-  let keyEnd = colon;
-  while (keyEnd > keyStart && source.charCodeAt(keyEnd - 1) === SPACE) keyEnd -= 1;
-  if (keyEnd <= keyStart) return skipLine;
+
+  // No key: the line is a node of its own, and it absorbs its value run. One that opens a flow
+  // collection, a block scalar or a quote and sits on a line of its own absorbs the region.
+  if (colon < 0) {
+    const isOwnLine =
+      !hasMarker &&
+      (isOpenQuote ||
+        first === LBRACE ||
+        first === LBRACKET ||
+        first === PIPE ||
+        first === GREATER);
+    return isOwnLine
+      ? ownLineRunEnd(source, lines, li, indent)
+      : valueRunEnd(source, lines, li, indent);
+  }
 
   // step 6 — an empty value means a nested node, whose lines ARE scanned on their own.
   let v = colon + 1;
   while (v < line.end && source.charCodeAt(v) === SPACE) v += 1;
   if (v >= line.end) return skipLine;
 
-  // step 7 — the line carries an inline value, so its continuation lines belong to that value.
+  // step 7 — the line carries an inline value, so its continuation lines belong to that value. A
+  // declined key's value absorbs them only if it can continue on the next line.
+  const value = source.charCodeAt(v);
+  if (isDeclined) {
+    let isOpen =
+      value === PIPE ||
+      value === GREATER ||
+      value === LBRACE ||
+      value === LBRACKET ||
+      value === AMPERSAND ||
+      value === BANG;
+    if (value === DQUOTE || value === SQUOTE) {
+      const close = closingQuote(source, line, v);
+      let p = close + 1;
+      while (p < line.end && source.charCodeAt(p) === SPACE) p += 1;
+      isOpen = close < 0 || (p < line.end && source.charCodeAt(p) !== HASH);
+    }
+    return isOpen ? valueRunEnd(source, lines, li, indent) : skipLine;
+  }
   const next = valueRunEnd(source, lines, li, indent);
 
   // step 8 — the key must be listed. Checked before the value's form, so an unlisted key costs
   // nothing to decline: this is what makes `run:`, `if:` and `image:` unreachable.
   if (!listed.has(source.slice(keyStart, keyEnd))) return next;
-
-  // step 9 — a line carrying a lone U+000D yields no spans, but its value run is still consumed.
-  if (hasLoneCarriageReturn(source, line)) return next;
+  if (isQuiet) return next;
 
   // step 9 — the scalar form.
-  const value = source.charCodeAt(v);
   if (
     value === HASH ||
     value === AMPERSAND ||
@@ -237,10 +393,10 @@ function scanLine(
     return next;
   }
   if (value === DQUOTE || value === SQUOTE) {
-    if (next === li + 1) quotedScalar(source, line, v, spans);
+    if (!hasContinuation(source, lines, li, next)) quotedScalar(source, line, v, spans);
     return next;
   }
-  if (next === li + 1) plainScalar(source, line, v, spans);
+  if (!hasContinuation(source, lines, li, next)) plainScalar(source, line, v, spans);
   return next;
 }
 
