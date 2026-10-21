@@ -1,25 +1,25 @@
 {
   "_meta": {
-    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured DOWNWARD for the 1.4.x line: gen-locales.mjs stopped embedding `sources`, which was 94% of the locale payload by raw bytes and no rule reads. text 88.7 -> 19.7 KB gzip, yaml 90.6 -> 21.6, html 137.9 -> 68.6, index and markdown 234.7 -> 165.5. The budget now guards a much smaller number, which is the point: re-embedding the citations would trip it immediately rather than hiding inside a quarter-megabyte of prose."
+    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured DOWNWARD for the 1.4.x line: gen-locales.mjs stopped embedding `sources`, which was 94% of the locale payload by raw bytes and no rule reads. text 88.7 -> 19.7 KB gzip, yaml 90.6 -> 21.6, html 137.9 -> 68.6, index and markdown 234.7 -> 165.5. The budget now guards a much smaller number, which is the point: re-embedding the citations would trip it immediately rather than hiding inside a quarter-megabyte of prose. Re-measured upward for spec 1.12.0: growth is locale data only (sk, ro, hu, bg, hr), +5.9% raw on `text` and +8.2% on `yaml` because those entries are almost nothing but data; scripts/check-entry-reach.mjs proves no parser reached any entry."
   },
   "index": {
-    "raw": 580174,
-    "gzip": 169504
+    "raw": 587945,
+    "gzip": 171192
   },
   "text": {
-    "raw": 62783,
-    "gzip": 20144
+    "raw": 66501,
+    "gzip": 20556
   },
   "html": {
-    "raw": 230490,
-    "gzip": 70211
+    "raw": 234310,
+    "gzip": 70628
   },
   "markdown": {
-    "raw": 575789,
-    "gzip": 169005
+    "raw": 586446,
+    "gzip": 171850
   },
   "yaml": {
-    "raw": 68342,
-    "gzip": 22100
+    "raw": 73914,
+    "gzip": 23037
   }
 }
