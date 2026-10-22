@@ -13,7 +13,7 @@ import type { Dialect, Options } from "./types.js";
  * `mode` is absent from `MarkdownOptions`, since this entry only ever runs `markdown` mode.
  * `dialect` keeps the aggregate entry's contract: required, no default (types.ts).
  */
-export type MarkdownOptions = Omit<Options, "mode"> & {
+export type MarkdownOptions = Omit<Options, "mode" | "protect"> & {
   dialect: Dialect;
 };
 

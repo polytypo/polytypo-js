@@ -53,6 +53,18 @@ export interface Options {
    * rule's target rather than post-processing the output, so the result stays a fixed point.
    */
   narrowNbsp?: NarrowNbsp;
+  /**
+   * Optional, `text` mode only (spec/rules/modes.md §3.9, spec 1.13.0). Ranges of the input, in
+   * code points, `[start, end)`, that are never edited and that the rules see as opaque content.
+   * Ascending, non-overlapping; touching ranges are one. Any other value throws
+   * `POLYTYPO_INVALID_OPTION`, and so does a non-empty list in any mode but `text`.
+   */
+  protect?: readonly ProtectRange[];
+}
+
+export interface ProtectRange {
+  readonly start: number;
+  readonly end: number;
 }
 
 /** nbsp.md §3.1a. `"narrow"` (the default) emits U+202F; `"nbsp"` emits U+00A0 in its place. */

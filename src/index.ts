@@ -31,6 +31,7 @@ export type {
   Mode,
   NarrowNbsp,
   Options,
+  ProtectRange,
   QuotePair,
   Rule,
   RuleContext,

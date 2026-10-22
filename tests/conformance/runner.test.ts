@@ -16,7 +16,11 @@ import {
 const files = discoverFixtureFiles();
 const totalCases = files.reduce((sum, f) => sum + f.cases.length, 0);
 
-function optionsFor(locale: string, testCase: ConformanceCase): Options {
+function optionsFor(
+  locale: string,
+  testCase: ConformanceCase,
+  protect: unknown = testCase.protect,
+): Options {
   const base: Options =
     testCase.dialect === undefined
       ? { locale, mode: testCase.mode }
@@ -35,9 +39,15 @@ function optionsFor(locale: string, testCase: ConformanceCase): Options {
     testCase.keys === undefined ? withNarrow : { ...withNarrow, keys: testCase.keys };
   // Same reasoning for `frontmatterKeys` (spec 1.7.0): a case carrying it is a fixed point under
   // it, and re-running without it would compare the block against a run that never saw it.
-  return testCase.frontmatterKeys === undefined
-    ? withKeys
-    : { ...withKeys, frontmatterKeys: testCase.frontmatterKeys };
+  const withFrontmatterKeys =
+    testCase.frontmatterKeys === undefined
+      ? withKeys
+      : { ...withKeys, frontmatterKeys: testCase.frontmatterKeys };
+  // `protect` (spec 1.13.0) is passed as written, even when malformed: a `throws` case carries
+  // exactly the values the engine must refuse.
+  return protect === undefined
+    ? withFrontmatterKeys
+    : ({ ...withFrontmatterKeys, protect } as Options);
 }
 
 function assertThrowsCode(label: string, code: string, run: () => string): void {
@@ -95,7 +105,10 @@ describe("conformance fixtures", () => {
         // Free coverage, and the most common port bug (section 6.1).
         it(`${testCase.id} [${testCase.rule}] is idempotent`, () => {
           expect(
-            escapeNonAscii(transform(expected, options)),
+            escapeNonAscii(
+              // The ranges move with the edits, so the second call is told where they now are.
+              transform(expected, optionsFor(file.locale, testCase, testCase.protectOut)),
+            ),
             `${label}: transform(out) must equal out`,
           ).toBe(escapeNonAscii(expected));
         });

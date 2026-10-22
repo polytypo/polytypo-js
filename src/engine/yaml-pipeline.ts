@@ -3,6 +3,7 @@ import type { Options } from "../types.js";
 import { getLocaleData } from "./locale.js";
 import { resolveNarrowTarget } from "./narrow-target.js";
 import { resolveYamlKeys } from "./yaml-keys.js";
+import { assertNoProtect } from "./protect.js";
 import { planRules } from "./rule-runner.js";
 import { analyzeOverSpans, runOverSpans } from "./span-runner.js";
 import type { Change } from "./origin.js";
@@ -19,6 +20,7 @@ export function runYamlPipeline(input: string, options: Partial<Options>): strin
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
   const keys = resolveYamlKeys(options.keys);
+  assertNoProtect(options.protect, "yaml");
   return runOverSpans(input, yamlSpans(input, keys), planned, locale, "yaml", narrowTarget);
 }
 
@@ -28,5 +30,6 @@ export function analyzeYamlPipeline(input: string, options: Partial<Options>): C
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
   const keys = resolveYamlKeys(options.keys);
+  assertNoProtect(options.protect, "yaml");
   return analyzeOverSpans(input, yamlSpans(input, keys), planned, locale, "yaml", narrowTarget);
 }

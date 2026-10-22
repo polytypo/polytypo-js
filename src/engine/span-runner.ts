@@ -20,7 +20,7 @@ import { runRulesRecording } from "./rule-runner.js";
  * an edit shifts every index after it; the markers themselves always survive, since no edit may
  * contain one.
  */
-function runRulesOverSpans(
+export function runRulesOverSpans(
   cp: readonly number[],
   planned: readonly RuleId[],
   locale: LocaleData,

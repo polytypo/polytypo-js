@@ -2,6 +2,7 @@ import { htmlSpans } from "../modes/html.js";
 import type { Options } from "../types.js";
 import { getLocaleData } from "./locale.js";
 import { resolveNarrowTarget } from "./narrow-target.js";
+import { assertNoProtect } from "./protect.js";
 import { planRules } from "./rule-runner.js";
 import { analyzeOverSpans, runOverSpans } from "./span-runner.js";
 import type { Change } from "./origin.js";
@@ -19,6 +20,7 @@ export function runHtmlPipeline(input: string, options: Partial<Options>): strin
   const narrowTarget = resolveNarrowTarget(options.narrowNbsp);
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
+  assertNoProtect(options.protect, "html");
   const spans = htmlSpans(input);
   return runOverSpans(input, spans, planned, locale, "html", narrowTarget);
 }
@@ -28,5 +30,6 @@ export function analyzeHtmlPipeline(input: string, options: Partial<Options>): C
   const narrowTarget = resolveNarrowTarget(options.narrowNbsp);
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
+  assertNoProtect(options.protect, "html");
   return analyzeOverSpans(input, htmlSpans(input), planned, locale, "html", narrowTarget);
 }

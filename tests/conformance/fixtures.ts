@@ -47,6 +47,13 @@ export interface ConformanceCase {
    * frontmatter keys the case opts into. Absent means the block is skipped whole.
    */
   readonly frontmatterKeys?: readonly string[] | undefined;
+  /**
+   * spec 1.13.0, modes.md §3.9. Deliberately `unknown`: a `throws` case carries the malformed
+   * values §3.9.2 refuses, and the runner must pass them to `transform` untouched.
+   */
+  readonly protect?: unknown;
+  /** The protected runs located in `out`; the idempotency call passes these, not `protect`. */
+  readonly protectOut?: unknown;
 }
 
 export interface ConformanceFile {
@@ -188,6 +195,8 @@ function parseCase(raw: unknown, where: string): ConformanceCase {
     narrowNbsp: parseNarrowNbsp(raw.narrowNbsp, where),
     keys: parseKeys(raw.keys, mode, where),
     frontmatterKeys: parseFrontmatterKeys(raw.frontmatterKeys, mode, where),
+    protect: raw.protect,
+    protectOut: raw.protectOut,
   };
 }
 

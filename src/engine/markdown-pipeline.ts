@@ -2,6 +2,7 @@ import { frontmatterSpans, markdownSpans, resolveDialect } from "../modes/markdo
 import type { Dialect, Options } from "../types.js";
 import { getLocaleData } from "./locale.js";
 import { resolveNarrowTarget } from "./narrow-target.js";
+import { assertNoProtect } from "./protect.js";
 import { planRules } from "./rule-runner.js";
 import { resolveFrontmatterKeys } from "./yaml-keys.js";
 import { analyzeOverUnits, runOverUnits } from "./span-runner.js";
@@ -24,6 +25,7 @@ export function runMarkdownPipeline(input: string, options: Partial<Options>): s
   const locale = getLocaleData(options.locale);
   const dialect = resolveDialect(options.dialect);
   const frontmatterKeys = resolveFrontmatterKeys(options.frontmatterKeys);
+  assertNoProtect(options.protect, "markdown");
   const units = unitsOf(input, dialect, frontmatterKeys);
   return runOverUnits(input, units, planned, locale, "markdown", narrowTarget);
 }
@@ -57,6 +59,7 @@ export function analyzeMarkdownPipeline(input: string, options: Partial<Options>
   const locale = getLocaleData(options.locale);
   const dialect = resolveDialect(options.dialect);
   const frontmatterKeys = resolveFrontmatterKeys(options.frontmatterKeys);
+  assertNoProtect(options.protect, "markdown");
   return analyzeOverUnits(
     input,
     unitsOf(input, dialect, frontmatterKeys),

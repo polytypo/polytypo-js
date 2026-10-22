@@ -58,6 +58,20 @@ export interface Change {
 }
 
 /**
+ * Where a change ends in the input. A non-empty edit ends one past the input character its last
+ * replaced code point came from; scanning forward from `edit.end` instead, as `originAt` does for
+ * a start, would carry the end across a skipped region or a protected run that follows (the
+ * boundary marker has no origin), and the reported range would contain text the rules never saw.
+ */
+function endOf(origin: readonly number[], edit: Edit, inputLength: number): number {
+  for (let i = edit.end - 1; i >= edit.start; i -= 1) {
+    const value = origin[i] as number;
+    if (value !== NO_ORIGIN) return value + 1;
+  }
+  return originAt(origin, edit.end, inputLength);
+}
+
+/**
  * One rule's edits, in the coordinates that rule saw, rendered as Changes in input coordinates.
  * `before` is the text this rule replaced and `after` what it replaced it with (analyze.md §2),
  * so on a text two rules have both touched, `before` is what the second rule saw rather than
@@ -73,7 +87,7 @@ export function recordChanges(
   return edits.map((edit) => ({
     ruleId,
     start: originAt(origin, edit.start, inputLength),
-    end: originAt(origin, edit.end, inputLength),
+    end: endOf(origin, edit, inputLength),
     before: fromCodePoints(cp.slice(edit.start, edit.end)),
     after: fromCodePoints(edit.replacement),
   }));

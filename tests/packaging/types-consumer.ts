@@ -47,3 +47,17 @@ void yamlOptionsMissingKeys;
 // @ts-expect-error YamlOptions has no `mode` field — a literal with one is a compile error.
 const yamlOptionsBad: YamlOptions = { ...yamlOptions, mode: "text" };
 void yamlOptionsBad;
+
+// `protect` is a text-mode option: polytypo/text takes it, the entries whose mode cannot are
+// compile errors rather than a runtime refusal alone.
+const textProtected: TextOptions = { locale: "en-US", protect: [{ start: 0, end: 1 }] };
+transformText("x", textProtected);
+// @ts-expect-error HtmlOptions has no `protect` field.
+const htmlProtected: HtmlOptions = { locale: "en-US", protect: [{ start: 0, end: 1 }] };
+void htmlProtected;
+// @ts-expect-error MarkdownOptions has no `protect` field.
+const markdownProtected: MarkdownOptions = { ...markdownOptions, protect: [{ start: 0, end: 1 }] };
+void markdownProtected;
+// @ts-expect-error YamlOptions has no `protect` field.
+const yamlProtected: YamlOptions = { locale: "en-US", keys: [], protect: [{ start: 0, end: 1 }] };
+void yamlProtected;

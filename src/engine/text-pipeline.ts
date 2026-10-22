@@ -4,6 +4,7 @@ import type { Change } from "./origin.js";
 import { getLocaleData } from "./locale.js";
 import { resolveNarrowTarget } from "./narrow-target.js";
 import { planRules, runRules, runRulesRecording } from "./rule-runner.js";
+import { analyzeProtected, resolveProtect, runProtected } from "./protect.js";
 
 /**
  * `text` mode only. Deliberately imports nothing from `../modes/html.js` or
@@ -20,6 +21,8 @@ export function runTextPipeline(input: string, options: Partial<Options>): strin
   const narrowTarget = resolveNarrowTarget(options.narrowNbsp);
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
+  const holes = resolveProtect(options.protect, toCodePoints(input).length);
+  if (holes.length > 0) return runProtected(input, holes, planned, locale, narrowTarget);
   return fromCodePoints(runRules(toCodePoints(input), planned, locale, "text", narrowTarget));
 }
 
@@ -29,6 +32,8 @@ export function analyzeTextPipeline(input: string, options: Partial<Options>): C
   const planned = planRules(options.rules);
   const locale = getLocaleData(options.locale);
   const cp = toCodePoints(input);
+  const holes = resolveProtect(options.protect, cp.length);
+  if (holes.length > 0) return analyzeProtected(input, holes, planned, locale, narrowTarget);
   const origin = cp.map((_value, index) => index);
   return runRulesRecording(cp, planned, locale, "text", narrowTarget, origin, cp.length);
 }

@@ -126,6 +126,24 @@ scalar containing `''` among them, which is how an apostrophe is written inside 
 The block is also processed separately from the body, which shows up in exactly one place: an
 unbalanced quotation mark in `title` cannot pair with a mark in your first paragraph.
 
+`text` mode takes a `protect` option for strings with holes in them, such as template literals or
+ICU messages: ranges of the input that are never edited and that the rules read as content. Offsets
+are Unicode code points, `[start, end)`, ascending and non-overlapping:
+
+```ts
+import { transform } from "polytypo/text";
+
+transform("${x} - Rules", { locale: "en-US", protect: [{ start: 0, end: 4 }] });
+// ${x}—Rules
+```
+
+Text next to a hole converts less than the same text would unsplit, never more: a character
+polytypo would insert beside the hole is not written. A hole containing a line break counts as a
+line break to the rules. A malformed list throws `POLYTYPO_INVALID_OPTION`, and so does a non-empty
+list in `html`, `markdown` or `yaml` mode. An empty list is the same as no option. Running the
+output through again is a fixed point only if you move the ranges to where the edits left them;
+`transform` does not return them. `analyze()` takes the same option.
+
 `analyze()` runs the same pipeline and reports what it would do instead of doing it — one record
 per edit, each with the rule that made it and code-point offsets into the input you passed (into
 the **document**, in `html`, `markdown` and `yaml` mode, not into a span):
