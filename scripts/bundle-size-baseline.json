@@ -1,25 +1,25 @@
 {
   "_meta": {
-    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured DOWNWARD for the 1.4.x line: gen-locales.mjs stopped embedding `sources`, which was 94% of the locale payload by raw bytes and no rule reads. text 88.7 -> 19.7 KB gzip, yaml 90.6 -> 21.6, html 137.9 -> 68.6, index and markdown 234.7 -> 165.5. The budget now guards a much smaller number, which is the point: re-embedding the citations would trip it immediately rather than hiding inside a quarter-megabyte of prose. Re-measured upward for spec 1.12.0: growth is locale data only (sk, ro, hu, bg, hr), +5.9% raw on `text` and +8.2% on `yaml` because those entries are almost nothing but data; scripts/check-entry-reach.mjs proves no parser reached any entry. Re-measured upward for spec 1.13.0: the `protect` option adds one small module to the `text`, `yaml`, `html`, `markdown` and `index` entries (+1.5% raw on `text`); scripts/check-entry-reach.mjs proves no parser reached any entry."
+    "description": "Post-split baseline: measured from the four separate entry points, for tracking future regressions from this point forward. NOT the pre-split measurement — see HISTORICAL_PRE_SPLIT_AGGREGATE in this script and AUDIT_REMEDIATION_AND_RELEASE_PLAN.md 5.1. Re-measured DOWNWARD for the 1.4.x line: gen-locales.mjs stopped embedding `sources`, which was 94% of the locale payload by raw bytes and no rule reads. text 88.7 -> 19.7 KB gzip, yaml 90.6 -> 21.6, html 137.9 -> 68.6, index and markdown 234.7 -> 165.5. The budget now guards a much smaller number, which is the point: re-embedding the citations would trip it immediately rather than hiding inside a quarter-megabyte of prose. Re-measured upward for spec 1.12.0: growth is locale data only (sk, ro, hu, bg, hr), +5.9% raw on `text` and +8.2% on `yaml` because those entries are almost nothing but data; scripts/check-entry-reach.mjs proves no parser reached any entry. Re-measured upward for spec 1.13.0: the `protect` option adds one small module to the `text`, `yaml`, `html`, `markdown` and `index` entries (+1.5% raw on `text`); scripts/check-entry-reach.mjs proves no parser reached any entry. Re-measured upward for spec 1.14.0: growth is locale data only (sr), under 1% raw on every entry."
   },
   "index": {
-    "raw": 590014,
-    "gzip": 171974
+    "raw": 590538,
+    "gzip": 172014
   },
   "text": {
-    "raw": 69100,
-    "gzip": 21459
+    "raw": 69624,
+    "gzip": 21486
   },
   "html": {
-    "raw": 234631,
-    "gzip": 70852
+    "raw": 235155,
+    "gzip": 70887
   },
   "markdown": {
-    "raw": 586776,
-    "gzip": 171990
+    "raw": 587300,
+    "gzip": 172016
   },
   "yaml": {
-    "raw": 74231,
-    "gzip": 23250
+    "raw": 74755,
+    "gzip": 23274
   }
 }
