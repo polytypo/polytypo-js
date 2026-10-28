@@ -26,13 +26,18 @@ export function runRulesOverSpans(
   locale: LocaleData,
   mode: Mode,
   narrowTarget: number,
+  guarded: readonly boolean[] = [],
 ): readonly number[] {
   let current = cp;
   for (const id of planned) {
     const rule = RULES[id];
     if (rule === undefined) continue;
     const edits = rule.apply({ cp: current, locale, mode, narrowTarget });
-    current = applyEdits(current, filterBoundaryEdits(current, edits, spanRangesOf(current)), id);
+    current = applyEdits(
+      current,
+      filterBoundaryEdits(current, edits, spanRangesOf(current), mode === "markdown", guarded),
+      id,
+    );
   }
   return current;
 }
@@ -69,6 +74,7 @@ function replacementsOfUnit(
     locale,
     mode,
     narrowTarget,
+    normalized.map((span) => span.urlTail === true),
   );
   const pieces = splitOnMarker(transformed, normalized.length);
   return normalized.map((span, i) => ({ span, text: fromCodePoints(pieces[i] as number[]) }));
@@ -158,6 +164,13 @@ export function analyzeOverSpans(
     narrowTarget,
     originOfSpans(source, normalized),
     toCodePoints(source).length,
-    (current, edits) => filterBoundaryEdits(current, edits, spanRangesOf(current)),
+    (current, edits) =>
+      filterBoundaryEdits(
+        current,
+        edits,
+        spanRangesOf(current),
+        mode === "markdown",
+        normalized.map((span) => span.urlTail === true),
+      ),
   );
 }

@@ -8,7 +8,7 @@ import type { Dialect } from "../types.js";
 import { htmlFragmentSpans, isSkippedElement } from "./html.js";
 import { yamlSpans } from "./yaml.js";
 import { wrapParserErrors } from "./parse-error.js";
-import type { Span } from "./spans.js";
+import { normalizeSpans, type Span } from "./spans.js";
 
 /**
  * spec/rules/modes.md 3.7. Each entry is skipped **whole**, including anything that looks
@@ -26,12 +26,14 @@ const SKIPPED_TOKEN_TYPES: ReadonlySet<string> = new Set([
   "codeText",
   // autolinks `<https://…>`, and GFM's bare-URL form
   "autolink",
-  "literalAutolink",
   // link and image destinations and titles; the definition line of a reference link. The link
   // *text* is a `labelText`, which is not skipped.
   "resource",
   "reference",
   "definition",
+  // GFM footnotes: the call's label and the definition's label are matched against each other
+  "gfmFootnoteCall",
+  "gfmFootnoteDefinitionLabel",
   // MDX: expression containers in full, and every JSX attribute — the whole tag is skipped, so
   // attributes never surface. JSX element *children* sit outside the tag tokens and are
   // processable.
@@ -322,6 +324,108 @@ function maskFrontmatter(source: string, block: FrontmatterBlock | null): string
   return masked + source.slice(block.end);
 }
 
+/** modes.md 3.7.3 (spec 1.17.2): the text of a shortcut or collapsed reference is its label. */
+function labelRanges(events: readonly Event[], shift: number): Span[] {
+  const ranges: Span[] = [];
+  const open: { hasDest: boolean; labels: Span[] }[] = [];
+  for (const [kind, token] of events) {
+    const type: string = token.type;
+    if (type === "link" || type === "image") {
+      if (kind === "enter") open.push({ hasDest: false, labels: [] });
+      else {
+        const done = open.pop();
+        if (done !== undefined && !done.hasDest) ranges.push(...done.labels);
+      }
+      continue;
+    }
+    const top = open[open.length - 1];
+    if (top === undefined || kind !== "enter") continue;
+    if (type === "resource" || type === "referenceString") top.hasDest = true;
+    if (type === "labelText") {
+      top.labels.push({ start: token.start.offset + shift, end: token.end.offset + shift });
+    }
+  }
+  return ranges;
+}
+
+function startsUrl(source: string, i: number, end: number): boolean {
+  const lower = (k: number) => {
+    const c = source.charCodeAt(k);
+    return c >= 0x41 && c <= 0x5a ? c + 0x20 : c;
+  };
+  const at = (word: string) => {
+    if (i + word.length > end) return false;
+    for (let k = 0; k < word.length; k += 1) if (lower(i + k) !== word.charCodeAt(k)) return false;
+    return true;
+  };
+  return at("www.") || at("http://") || at("https://");
+}
+
+/**
+ * modes.md 3.7.3 (spec 1.17.2): the tail of a bare URL, found by scanning the source rather than
+ * asking a parser, because parsers disagree about where a URL may start and where it ends.
+ */
+function trimUrlTails(
+  source: string,
+  spans: readonly Span[],
+  urlEnds: ReadonlySet<number>,
+): Span[] {
+  const out: Span[] = [];
+  for (const span of spans) {
+    let from = span.start;
+    let i = span.start;
+    let guard =
+      span.urlTail === true ||
+      (urlEnds.has(span.start) &&
+        (source.charCodeAt(span.start) === 0x20 || source.charCodeAt(span.start) === 0x09));
+    while (i < span.end) {
+      if (!(i === span.start && urlEnds.has(i)) && !startsUrl(source, i, span.end)) {
+        i += 1;
+        continue;
+      }
+      let e = i;
+      while (e < span.end) {
+        const c = source.charCodeAt(e);
+        if (c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d || c === 0x3c) break;
+        e += 1;
+      }
+      if (e === i) {
+        i += 1;
+        continue;
+      }
+      if (i > from)
+        out.push(guard ? { start: from, end: i, urlTail: true } : { start: from, end: i });
+      guard = e < span.end && (source.charCodeAt(e) === 0x20 || source.charCodeAt(e) === 0x09);
+      from = e;
+      i = e;
+    }
+    if (from < span.end)
+      out.push(
+        guard ? { start: from, end: span.end, urlTail: true } : { start: from, end: span.end },
+      );
+  }
+  return out;
+}
+
+function removeRanges(spans: readonly Span[], ranges: readonly Span[]): Span[] {
+  if (ranges.length === 0) return [...spans];
+  const out: Span[] = [];
+  for (const span of spans) {
+    let pieces: Span[] = [span];
+    for (const r of ranges) {
+      pieces = pieces.flatMap((q) => {
+        if (r.end <= q.start || r.start >= q.end) return [q];
+        const res: Span[] = [];
+        if (q.start < r.start) res.push({ start: q.start, end: r.start });
+        if (r.end < q.end) res.push({ start: r.end, end: q.end });
+        return res;
+      });
+    }
+    out.push(...pieces);
+  }
+  return out;
+}
+
 /**
  * modes.md 3.7. The body's spans. The document reaches the parser with its frontmatter block
  * masked out (3.7.3a), so the block is skipped because the scan located it, not because an
@@ -393,8 +497,23 @@ export function markdownSpans(source: string, dialect: Dialect): Span[] {
     }
   }
 
-  if (block === null) return spans;
-  return spans.flatMap((span) => {
+  const urlEnds = new Set<number>();
+  for (const [kind, token] of events) {
+    if (
+      kind === "exit" &&
+      (token.type as string) === "literalAutolink" &&
+      startsUrl(source, token.start.offset + shift, token.end.offset + shift)
+    ) {
+      urlEnds.add(token.end.offset + shift);
+    }
+  }
+  const trimmed = trimUrlTails(
+    source,
+    normalizeSpans(removeRanges(spans, labelRanges(events, shift))),
+    urlEnds,
+  );
+  if (block === null) return trimmed;
+  return trimmed.flatMap((span) => {
     if (span.start >= block.end) return [span];
     if (span.end <= block.end) return [];
     return [{ start: block.end, end: span.end }];

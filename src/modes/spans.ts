@@ -38,6 +38,8 @@ function gapIsLineBoundary(source: string, from: number, to: number): boolean {
 export interface Span {
   readonly start: number;
   readonly end: number;
+  /** The span begins at the terminator of a GFM autolink literal (modes.md 3.7.3). */
+  readonly urlTail?: boolean;
 }
 
 /** A span's extent in the concatenated code-point array: `s₀` and `s₁` of modes.md 3.4. */
@@ -67,7 +69,7 @@ export function normalizeSpans(spans: readonly Span[]): Span[] {
       );
     }
     if (span.start === last.end) {
-      out[out.length - 1] = { start: last.start, end: span.end };
+      out[out.length - 1] = { ...last, end: span.end };
       continue;
     }
     out.push(span);
@@ -114,6 +116,46 @@ function spanContaining(ranges: readonly SpanRange[], p: number): SpanRange | un
   return undefined;
 }
 
+const DELIMITERS: ReadonlySet<number> = new Set([0x2a, 0x5f, 0x7e]);
+
+function isMarkdownWhitespace(c: number | undefined): boolean {
+  if (c === undefined) return false;
+  return (
+    c === 0x09 ||
+    c === 0x0a ||
+    c === 0x0c ||
+    c === 0x0d ||
+    c === 0x20 ||
+    c === 0xa0 ||
+    c === 0x1680 ||
+    (c >= 0x2000 && c <= 0x200a) ||
+    c === 0x202f ||
+    c === 0x205f ||
+    c === 0x3000
+  );
+}
+
+/** modes.md 3.4 delimiter-neighbour rule (markdown only): see the spec text. */
+function changesDelimiterFlank(
+  cp: readonly number[],
+  p: number,
+  q: number,
+  w: readonly number[],
+): boolean {
+  const r = w.length;
+  if (p - 1 >= 0 && DELIMITERS.has(cp[p - 1] as number)) {
+    const before = cp[p];
+    const after = r > 0 ? w[0] : cp[q + 1];
+    if (isMarkdownWhitespace(before) !== isMarkdownWhitespace(after)) return true;
+  }
+  if (q + 1 < cp.length && DELIMITERS.has(cp[q + 1] as number)) {
+    const before = cp[q];
+    const after = r > 0 ? w[r - 1] : cp[p - 1];
+    if (isMarkdownWhitespace(before) !== isMarkdownWhitespace(after)) return true;
+  }
+  return false;
+}
+
 /**
  * modes.md 3.4, two safety nets, both pure functions of `(p, q, r, s₀, s₁)` — so the verdict is
  * identical on every run, which is what makes redistribution deterministic (modes.md 5, point 3).
@@ -144,6 +186,8 @@ export function filterBoundaryEdits(
   cp: readonly number[],
   edits: readonly Edit[],
   ranges: readonly SpanRange[],
+  delimiterNeighbours = false,
+  guarded: readonly boolean[] = [],
 ): Edit[] {
   const out: Edit[] = [];
   for (const edit of edits) {
@@ -162,7 +206,11 @@ export function filterBoundaryEdits(
     const q = edit.end - 1;
     const d = edit.end - edit.start;
     const r = edit.replacement.length;
+    if (delimiterNeighbours && changesDelimiterFlank(cp, p, q, edit.replacement)) continue;
     const span = spanContaining(ranges, p);
+    if (span !== undefined && p === span.first && guarded[ranges.indexOf(span)] === true) {
+      if (edit.replacement.length === 0 || edit.replacement[0] !== SPACE) continue;
+    }
     if (span !== undefined && (p === span.first || q === span.last)) {
       if (r > d) continue;
       // The character clause. `r > d` is not the rule, only a formalisation of it that misses
