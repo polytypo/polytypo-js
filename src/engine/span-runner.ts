@@ -35,7 +35,7 @@ export function runRulesOverSpans(
     const edits = rule.apply({ cp: current, locale, mode, narrowTarget });
     current = applyEdits(
       current,
-      filterBoundaryEdits(current, edits, spanRangesOf(current), mode === "markdown", guarded),
+      filterBoundaryEdits(current, edits, spanRangesOf(current), mode, guarded),
       id,
     );
   }
@@ -169,7 +169,7 @@ export function analyzeOverSpans(
         current,
         edits,
         spanRangesOf(current),
-        mode === "markdown",
+        mode,
         normalized.map((span) => span.urlTail === true),
       ),
   );

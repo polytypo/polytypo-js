@@ -156,6 +156,60 @@ function changesDelimiterFlank(
   return false;
 }
 
+function isAsciiPunctuation(c: number | undefined): boolean {
+  if (c === undefined) return false;
+  return (
+    (c >= 0x21 && c <= 0x2f) || (c >= 0x3a && c <= 0x40) || (c >= 0x5b && c <= 0x60) || (c >= 0x7b && c <= 0x7e)
+  );
+}
+
+function isAsciiAlphanumeric(c: number | undefined): boolean {
+  if (c === undefined) return false;
+  return (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a);
+}
+
+/** modes.md 3.4 escape-and-reference rule, item 1 (markdown only, 1.17.4). */
+function createsEscape(
+  cp: readonly number[],
+  p: number,
+  q: number,
+  w: readonly number[],
+): boolean {
+  if (p - 1 < 0 || cp[p - 1] !== 0x5c) return false;
+  const before = cp[p];
+  const after = w.length > 0 ? w[0] : cp[q + 1];
+  return isAsciiPunctuation(before) !== isAsciiPunctuation(after);
+}
+
+/**
+ * modes.md 3.4 escape-and-reference rule, item 2 (markdown and html, 1.17.4): a deletion that
+ * makes `&`, an optional `#`, one or more ASCII letters or digits and `;` adjacent around the
+ * join. A marker is in no class and stops either scan.
+ */
+function createsReference(
+  cp: readonly number[],
+  p: number,
+  q: number,
+  w: readonly number[],
+): boolean {
+  if (w.length !== 0 || p - 1 < 0 || q + 1 >= cp.length) return false;
+  let left = p - 1;
+  let alnum = 0;
+  while (left >= 0 && isAsciiAlphanumeric(cp[left])) {
+    left -= 1;
+    alnum += 1;
+  }
+  let right = q + 1;
+  if (cp[left] === 0x26 && cp[right] === 0x23 && alnum === 0) right += 1;
+  while (right < cp.length && isAsciiAlphanumeric(cp[right])) {
+    right += 1;
+    alnum += 1;
+  }
+  if (cp[right] !== 0x3b || alnum === 0) return false;
+  if (left >= 0 && cp[left] === 0x23) left -= 1;
+  return left >= 0 && cp[left] === 0x26;
+}
+
 /**
  * modes.md 3.4, two safety nets, both pure functions of `(p, q, r, s₀, s₁)` — so the verdict is
  * identical on every run, which is what makes redistribution deterministic (modes.md 5, point 3).
@@ -186,7 +240,7 @@ export function filterBoundaryEdits(
   cp: readonly number[],
   edits: readonly Edit[],
   ranges: readonly SpanRange[],
-  delimiterNeighbours = false,
+  mode: string | undefined = undefined,
   guarded: readonly boolean[] = [],
 ): Edit[] {
   const out: Edit[] = [];
@@ -206,7 +260,11 @@ export function filterBoundaryEdits(
     const q = edit.end - 1;
     const d = edit.end - edit.start;
     const r = edit.replacement.length;
-    if (delimiterNeighbours && changesDelimiterFlank(cp, p, q, edit.replacement)) continue;
+    if (mode === "markdown" && changesDelimiterFlank(cp, p, q, edit.replacement)) continue;
+    if (mode === "markdown" && createsEscape(cp, p, q, edit.replacement)) continue;
+    if ((mode === "markdown" || mode === "html") && createsReference(cp, p, q, edit.replacement)) {
+      continue;
+    }
     const span = spanContaining(ranges, p);
     if (span !== undefined && p === span.first && guarded[ranges.indexOf(span)] === true) {
       if (edit.replacement.length === 0 || edit.replacement[0] !== SPACE) continue;
