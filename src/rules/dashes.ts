@@ -1,4 +1,4 @@
-import { isLetter } from "../engine/unicode.js";
+import { scanPaired } from "./dashes-paired.js";
 import type { Edit, Rule, RuleContext } from "../types.js";
 import {
   HYPHEN_MINUS,
@@ -7,6 +7,7 @@ import {
   EN_DASH,
   buildReplacement,
   isOpenBracket,
+  isRomanFlanked,
   isSpaced,
   isSpacingTransitionBlocked,
   isStripBeforeOrCloseBracket,
@@ -36,49 +37,11 @@ import {
  * code-point array, never a native string (ARCHITECTURE.md 4.1, 4.2).
  */
 
-/** dashes.md 3.1 ROMAN: the seven uppercase Roman-numeral letters only. Lower-case is not a member. */
-function isRoman(cp: number): boolean {
-  return (
-    cp === 0x49 || // I
-    cp === 0x56 || // V
-    cp === 0x58 || // X
-    cp === 0x4c || // L
-    cp === 0x43 || // C
-    cp === 0x44 || // D
-    cp === 0x4d // M
-  );
-}
-
-/**
- * dashes.md 3.4 P4 — Roman-numeral veto. A tight dash between two word-bounded ROMAN runs is a
- * range already in its correct Russian form (`в XV—XVII веках`); `ranges` cannot see it, because
- * ranges.md 3.3 needs a DIGIT on each side, so without this the parenthetical branch would space
- * out input that was already right.
- *
- * A veto only: it never converts. Admitting ROMAN runs as range candidates would also fix
- * `XV-XVII`, but it fires on all-caps words built from the same letters (`MIX`, `CIVIL`), and
- * converting is the direction that damages. The miss is recorded in dashes.md 7.10.
- */
-function isRomanFlanked(cp: readonly number[], left: number, right: number): boolean {
-  const n = cp.length;
-
-  if (!isRoman(cp[left] as number) || !isRoman(cp[right] as number)) return false;
-
-  let a = left;
-  while (a > 0 && isRoman(cp[a - 1] as number)) a -= 1;
-  if (a > 0 && isLetter(cp[a - 1] as number)) return false;
-
-  let b = right;
-  while (b + 1 < n && isRoman(cp[b + 1] as number)) b += 1;
-  if (b + 1 < n && isLetter(cp[b + 1] as number)) return false;
-
-  return true;
-}
-
 function scan(ctx: RuleContext): Edit[] {
   const cp = ctx.cp;
   const edits: Edit[] = [];
   const style: DashStyle = ctx.locale.dash.parenthetical;
+  if (style === "em-paired") return scanPaired(cp);
 
   for (const token of findDashTokens(cp)) {
     const { s, e, leftCp, rightCp, left, right, lsp, rsp } = token;

@@ -129,7 +129,8 @@ export interface LocaleData {
     readonly elisionClitics: ElisionClitics;
   };
   readonly dash: {
-    readonly parenthetical: "em-tight" | "em-spaced" | "en-tight" | "en-spaced" | "none";
+    readonly parenthetical:
+      "em-tight" | "em-spaced" | "em-paired" | "en-tight" | "en-spaced" | "none";
     readonly range: "em-tight" | "em-spaced" | "en-tight" | "en-spaced" | "none";
   };
   readonly ellipsis: {

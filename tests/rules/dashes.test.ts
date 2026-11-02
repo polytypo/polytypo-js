@@ -716,13 +716,15 @@ describe("dashes — no-break spaces", () => {
         const expected =
           style === "none"
             ? input
-            : (() => {
-                const target = style === "em-tight" || style === "em-spaced" ? EM : EN;
-                const wantSpaced = style === "em-spaced" || style === "en-spaced";
-                return wantSpaced
-                  ? `The plan ${target} if any ${target} fails`
-                  : `The plan${target}if any${target}fails`;
-              })();
+            : style === "em-paired"
+              ? `The plan ${EM}if any${EM} fails`
+              : (() => {
+                  const target = style === "em-tight" || style === "em-spaced" ? EM : EN;
+                  const wantSpaced = style === "em-spaced" || style === "en-spaced";
+                  return wantSpaced
+                    ? `The plan ${target} if any ${target} fails`
+                    : `The plan${target}if any${target}fails`;
+                })();
         expect(run(input, localeOf(tag)), `${tag} ${JSON.stringify(input)}`).toBe(expected);
       }
     }
@@ -927,5 +929,34 @@ describe("dashes — idempotency", () => {
       ),
       { numRuns: 1000 },
     );
+  });
+});
+
+describe("dashes — em-paired, spec §3.4a", () => {
+  const es = localeOf("es");
+
+  it("writes a pair with a space outside and none inside", () => {
+    expect(run("El plan - si existe - fracasa.", es)).toBe(`El plan ${EM}si existe${EM} fracasa.`);
+    expect(run("El plan--si existe--fracasa.", es)).toBe(`El plan ${EM}si existe${EM} fracasa.`);
+    expect(run(`Llegó ${EM}por fin${EM} a casa.`, es)).toBe(`Llegó ${EM}por fin${EM} a casa.`);
+  });
+
+  it("leaves a lone stroke, more than two strokes and a dialogue dash as typed", () => {
+    for (const input of [
+      "Madrid - la capital de España.",
+      "Juan - mi primo - llegó y - según dicen - durmió.",
+      `${EM}Hola ${EM}dijo${EM}.`,
+    ]) {
+      expect(run(input, es)).toBe(input);
+    }
+  });
+
+  it("does not let a terminal followed by a no-break space hold a pair together", () => {
+    const input = `Llegó - dijo el Sr.${NBSP}Pérez - a casa.`;
+    expect(run(input, es)).toBe(input);
+  });
+
+  it("counts the hyphen of +/- as no stroke, because symbols consumes it", () => {
+    expect(run("Llegó - con +/- 5 kg - a casa.", es)).toBe(`Llegó ${EM}con +/- 5 kg${EM} a casa.`);
   });
 });

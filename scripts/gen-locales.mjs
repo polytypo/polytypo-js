@@ -63,7 +63,7 @@ const specVersion = readFileSync(join(root, "spec", "VERSION"), "utf8").trim();
 // --- read the locale files --------------------------------------------------
 
 const QUOTE_INNER_SPACE = ["none", "nbsp", "narrow-nbsp"];
-const PARENTHETICAL = ["em-tight", "em-spaced", "en-tight", "en-spaced", "none"];
+const PARENTHETICAL = ["em-tight", "em-spaced", "em-paired", "en-tight", "en-spaced", "none"];
 const RANGE = ["em-tight", "em-spaced", "en-tight", "en-spaced", "none"];
 const INITIAL_BINDING = ["none", "chain", "single"];
 const SOURCE_RULES = [

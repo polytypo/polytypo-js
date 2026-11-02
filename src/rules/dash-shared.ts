@@ -1,3 +1,4 @@
+import { isLetter } from "../engine/unicode.js";
 import { LINE_MARKER, NONE } from "../engine/sentinels.js";
 import type { LocaleData } from "../types.js";
 
@@ -78,7 +79,7 @@ export function isNoBreakSpace(cp: number): boolean {
 export type DashStyle = LocaleData["dash"]["parenthetical"];
 
 export function dashCodePoint(style: DashStyle): number {
-  return style === "em-tight" || style === "em-spaced" ? EM_DASH : EN_DASH;
+  return style === "em-tight" || style === "em-spaced" || style === "em-paired" ? EM_DASH : EN_DASH;
 }
 
 export function isSpaced(style: DashStyle): boolean {
@@ -152,7 +153,7 @@ export function isDashUnion(cp: number): boolean {
 }
 
 /** dashes.md 3.2 step 7 — cluster guard. */
-function isClusterInert(cp: readonly number[], s: number, e: number): boolean {
+export function isClusterInert(cp: readonly number[], s: number, e: number): boolean {
   const n = cp.length;
   let start = s;
   while (start > 0 && isClusterMember(cp[start - 1] as number)) start -= 1;
@@ -296,19 +297,18 @@ export function isSpacingTransitionBlocked(
   left: number,
   right: number,
 ): boolean {
-  const n = cp.length;
+  return isSpacingTransitionBlockedLeft(cp, left) || isSpacingTransitionBlockedRight(cp, right);
+}
 
+/** The left half of T1, for a form that inserts a space on one side only (`em-paired`). */
+export function isSpacingTransitionBlockedLeft(cp: readonly number[], left: number): boolean {
   // Spec 1.3.0: the reach steps over a CLOSED-SYMBOL that sits between the token and a digit
-  // run, because ranges.md 3.2a made that shape a range token — the digit run whose verdict this
-  // guard protects is one code point further out than it used to be.
+  // run, because ranges.md 3.2a made that shape a range token — the digit run whose verdict
+  // this guard protects is one code point further out than it used to be.
   const l =
     isClosedUpSymbol(cp[left] as number) && left > 0 && isDigit(cp[left - 1] as number)
       ? left - 1
       : left;
-  const r =
-    isClosedUpSymbol(cp[right] as number) && right + 1 < n && isDigit(cp[right + 1] as number)
-      ? right + 1
-      : right;
 
   if (isDigit(cp[l] as number)) {
     let d = l;
@@ -319,6 +319,16 @@ export function isSpacingTransitionBlocked(
     if (isDashUnion(one)) return true;
     if ((one === SPACE || isNoBreakSpace(one)) && isDashUnion(two)) return true;
   }
+  return false;
+}
+
+/** The right half of T1; see {@link isSpacingTransitionBlockedLeft}. */
+export function isSpacingTransitionBlockedRight(cp: readonly number[], right: number): boolean {
+  const n = cp.length;
+  const r =
+    isClosedUpSymbol(cp[right] as number) && right + 1 < n && isDigit(cp[right + 1] as number)
+      ? right + 1
+      : right;
 
   if (isDigit(cp[r] as number)) {
     let d = r;
@@ -329,7 +339,6 @@ export function isSpacingTransitionBlocked(
     if (isDashUnion(one)) return true;
     if ((one === SPACE || isNoBreakSpace(one)) && isDashUnion(two)) return true;
   }
-
   return false;
 }
 
@@ -446,4 +455,43 @@ export function findDashTokens(cp: readonly number[]): DashToken[] {
   }
 
   return tokens;
+}
+
+/** dashes.md 3.1 ROMAN: the seven uppercase Roman-numeral letters only. Lower-case is not a member. */
+function isRoman(cp: number): boolean {
+  return (
+    cp === 0x49 || // I
+    cp === 0x56 || // V
+    cp === 0x58 || // X
+    cp === 0x4c || // L
+    cp === 0x43 || // C
+    cp === 0x44 || // D
+    cp === 0x4d // M
+  );
+}
+
+/**
+ * dashes.md 3.4 P4 — Roman-numeral veto. A tight dash between two word-bounded ROMAN runs is a
+ * range already in its correct Russian form (`в XV—XVII веках`); `ranges` cannot see it, because
+ * ranges.md 3.3 needs a DIGIT on each side, so without this the parenthetical branch would space
+ * out input that was already right.
+ *
+ * A veto only: it never converts. Admitting ROMAN runs as range candidates would also fix
+ * `XV-XVII`, but it fires on all-caps words built from the same letters (`MIX`, `CIVIL`), and
+ * converting is the direction that damages. The miss is recorded in dashes.md 7.10.
+ */
+export function isRomanFlanked(cp: readonly number[], left: number, right: number): boolean {
+  const n = cp.length;
+
+  if (!isRoman(cp[left] as number) || !isRoman(cp[right] as number)) return false;
+
+  let a = left;
+  while (a > 0 && isRoman(cp[a - 1] as number)) a -= 1;
+  if (a > 0 && isLetter(cp[a - 1] as number)) return false;
+
+  let b = right;
+  while (b + 1 < n && isRoman(cp[b + 1] as number)) b += 1;
+  if (b + 1 < n && isLetter(cp[b + 1] as number)) return false;
+
+  return true;
 }
