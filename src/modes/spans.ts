@@ -210,6 +210,50 @@ function createsReference(
   return left >= 0 && cp[left] === 0x26;
 }
 
+const SPACE_CP = 0x20;
+const BRACKET_OPEN = 0x5b;
+const BRACKET_CLOSE = 0x5d;
+const CARET = 0x5e;
+
+function isX(c: number | undefined): boolean {
+  return c === 0x78 || c === 0x58;
+}
+
+function isLabelCharacter(c: number | undefined): boolean {
+  return c !== undefined && c >= 0 && c !== SPACE_CP && c !== BRACKET_OPEN && c !== BRACKET_CLOSE;
+}
+
+function skipSpaces(cp: readonly number[], i: number, step: 1 | -1): number {
+  let k = i;
+  while (k >= 0 && k < cp.length && cp[k] === SPACE_CP) k += step;
+  return k;
+}
+
+/** modes.md 3.4 bracket-shape rule (markdown only, 1.17.5): a deletion that joins a task-list marker or a footnote label. */
+function createsBracketShape(
+  cp: readonly number[],
+  p: number,
+  q: number,
+  w: readonly number[],
+): boolean {
+  const isCollapse = w.length === 1 && w[0] === SPACE_CP;
+  if (w.length !== 0 && !isCollapse) return false;
+  const a = skipSpaces(cp, p - 1, -1);
+  const b = skipSpaces(cp, q + 1, 1);
+  if (isCollapse) return cp[a] === BRACKET_OPEN && cp[b] === BRACKET_CLOSE;
+  if (cp[a] === BRACKET_OPEN && cp[b] === BRACKET_CLOSE) return true;
+  if (cp[a] === BRACKET_OPEN) {
+    if (cp[b] === CARET) return true;
+    return isX(cp[b]) && cp[skipSpaces(cp, b + 1, 1)] === BRACKET_CLOSE;
+  }
+  if (cp[b] !== BRACKET_CLOSE) return false;
+  if (isX(cp[a]) && cp[skipSpaces(cp, a - 1, -1)] === BRACKET_OPEN) return true;
+  let run = a;
+  while (run >= 0 && isLabelCharacter(cp[run])) run -= 1;
+  const first = run + 1;
+  return a - first >= 1 && cp[first] === CARET && cp[skipSpaces(cp, run, -1)] === BRACKET_OPEN;
+}
+
 /**
  * modes.md 3.4, two safety nets, both pure functions of `(p, q, r, s₀, s₁)` — so the verdict is
  * identical on every run, which is what makes redistribution deterministic (modes.md 5, point 3).
@@ -262,6 +306,7 @@ export function filterBoundaryEdits(
     const r = edit.replacement.length;
     if (mode === "markdown" && changesDelimiterFlank(cp, p, q, edit.replacement)) continue;
     if (mode === "markdown" && createsEscape(cp, p, q, edit.replacement)) continue;
+    if (mode === "markdown" && createsBracketShape(cp, p, q, edit.replacement)) continue;
     if ((mode === "markdown" || mode === "html") && createsReference(cp, p, q, edit.replacement)) {
       continue;
     }
