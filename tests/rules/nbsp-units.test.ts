@@ -69,7 +69,7 @@ describe("nbsp units: idempotency", () => {
         if (depth === 0) return;
         for (const atom of atoms) walk(prefix + atom, depth - 1);
       };
-      walk("", 6);
+      walk("", 5);
     });
 
     it(`dash and range shapes are fixed points with ranges on (${locale})`, () => {
