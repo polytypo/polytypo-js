@@ -145,7 +145,7 @@ describe("nbsp — worked examples, spec §6 (ru)", () => {
   });
 
   it("N5 binds a unit to the preceding number (and N3 the short word before it)", () => {
-    expect(run("около 5 км и 20 %", ru)).toBe(`около 5${NBSP}км и${NBSP}20${NBSP}%`);
+    expect(run("около 5 км и 20 %", ru)).toBe(`около 5${NBSP}км и${NBSP}20%`);
   });
 });
 
@@ -172,9 +172,8 @@ describe("nbsp — worked examples, spec §6 (de)", () => {
     expect(run("Es sind 20 km bis 5 %", deDE)).toBe(`Es sind 20${NBSP}km bis 5${NBSP}%`);
   });
 
-  it("17. N5 never inserts (§7.2)", () => {
-    const input = "Es sind 20km";
-    expect(run(input, deDE)).toBe(input);
+  it("17. N5 inserts for spacedUnits (§3.7, spec 1.22.0)", () => {
+    expect(run("Es sind 20km", deDE)).toBe(`Es sind 20${NBSP}km`);
   });
 
   it("18. N5 step 4: a letter before the digit run blocks the bind", () => {
@@ -237,8 +236,13 @@ describe("nbsp — must not touch (spec §4)", () => {
     expect(run("(!)", fr)).toBe("(!)");
   });
 
-  it("leaves `5km`, `50%`, `H2O`, `A4` and `MP3` alone", () => {
+  it("leaves `5km`, `50%`, `H2O`, `A4` and `MP3` alone where the units are beforeUnits", () => {
     const input = "5km 50% H2O A4 MP3";
+    expect(run(input, localeOf("cs"))).toBe(input);
+  });
+
+  it("leaves `H2O`, `A4` and `MP3` alone where the units are spacedUnits", () => {
+    const input = "H2O A4km MP3kg";
     expect(run(input, deDE)).toBe(input);
   });
 
@@ -379,7 +383,7 @@ describe("nbsp — round trip", () => {
   });
 
   it("a locale with nothing to do is a total no-op", () => {
-    const input = "The plan - if there is one - fails: 12:30, 50%, A. B. Smith, «mot»!";
+    const input = "The plan - if there is one - fails: 12:30, A. B. Smith, «mot»!";
     // `en-US` is absent: it sets `initialBinding: "chain"`, so `A. B. Smith` is not a no-op there.
     for (const tag of ["en-GB", "sv"]) {
       const locale = localeOf(tag);

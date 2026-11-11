@@ -140,9 +140,7 @@ describe("locale data lookup", () => {
     // minItems: 1 — so asserting its presence here was a third copy of the same check. What is
     // worth pinning instead is its deliberate ABSENCE from the embedded data: 193 KB raw / 65 KB
     // gzipped of citation prose no rule reads, which used to ship in every bundle.
-    expect(data.sources, "citations must not be re-embedded — see gen-locales.mjs").toBe(
-      undefined,
-    );
+    expect(data.sources, "citations must not be re-embedded — see gen-locales.mjs").toBe(undefined);
   });
 
   it("reports a registry locale with no generated data as malformed", () => {

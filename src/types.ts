@@ -155,6 +155,8 @@ export interface LocaleData {
     readonly afterShortWords: readonly string[];
     readonly abbreviations: readonly string[];
     readonly beforeUnits: readonly string[];
+    readonly spacedUnits: readonly string[];
+    readonly closedUnits: readonly string[];
     readonly beforeNumber: readonly string[];
     readonly beforeWord: readonly string[];
     readonly afterSymbols: readonly string[];

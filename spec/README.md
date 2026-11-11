@@ -14,7 +14,7 @@ canonical's `spec/` changes, re-copy the affected files here.
 CI checks that it was done. `scripts/check-vendored-spec.sh` compares every file in this directory
 against canonical `polytypo/polytypo` at tag `spec-v` + this directory's own `VERSION`, and fails
 on any difference. Five details. The files this repository authors itself are listed in
-`.not-canonical` and skipped — and a listed path that canonical *does* have is an error, so that
+`.not-canonical` and skipped — and a listed path that canonical _does_ have is an error, so that
 list cannot be used to keep a forked copy of a canonical file. A `locales/*.json` file is compared
 in full when it carries its `sources` array, and against canonical minus that array when it does
 not, which is the shipped form three of the five runtimes vendor; the script reads which case it

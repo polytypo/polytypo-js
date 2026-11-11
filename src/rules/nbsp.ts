@@ -109,13 +109,21 @@ interface QuoteTarget {
   readonly target: number;
 }
 
+type UnitKind = "before" | "spaced" | "closed";
+
+interface UnitEntry {
+  readonly w: readonly number[];
+  readonly kind: UnitKind;
+}
+
 /** Locale data, resolved to code points once per call. No module-level state (ARCHITECTURE.md 7). */
 export interface Prepared {
   readonly beforePunctuation: readonly number[];
   readonly narrowBeforePunctuation: readonly number[];
   readonly shortWords: readonly (readonly number[])[];
   readonly abbreviations: readonly (readonly number[])[];
-  readonly units: readonly (readonly number[])[];
+  /** N5's three lists in one array, longest first (nbsp.md §3.7 step 1). */
+  readonly units: readonly UnitEntry[];
   readonly beforeNumber: readonly (readonly number[])[];
   readonly beforeWord: readonly (readonly number[])[];
   readonly symbols: readonly (readonly number[])[];
@@ -151,6 +159,21 @@ function contains(list: readonly number[], cp: number): boolean {
 function prepareList(entries: readonly string[]): (readonly number[])[] {
   const out = entries.map((entry) => toCodePoints(entry));
   out.sort((a, b) => b.length - a.length);
+  return out;
+}
+
+/** nbsp.md §3.7: the three unit lists, merged so the longest entry wins across all of them. */
+function prepareUnits(data: LocaleData["nbsp"]): UnitEntry[] {
+  const out: UnitEntry[] = [];
+  const lists: [readonly string[], UnitKind][] = [
+    [data.beforeUnits, "before"],
+    [data.spacedUnits, "spaced"],
+    [data.closedUnits, "closed"],
+  ];
+  for (const [entries, kind] of lists) {
+    for (const entry of entries) out.push({ w: toCodePoints(entry), kind });
+  }
+  out.sort((a, b) => b.w.length - a.w.length);
   return out;
 }
 
@@ -211,7 +234,7 @@ export function prepare(locale: LocaleData, narrowTarget: number = NNBSP): Prepa
     narrowBeforePunctuation,
     shortWords: prepareList(data.afterShortWords),
     abbreviations: prepareList(data.abbreviations),
-    units: prepareList(data.beforeUnits),
+    units: prepareUnits(data),
     beforeNumber: prepareList(data.beforeNumber),
     beforeWord: prepareList(data.beforeWord),
     symbols: prepareList(data.afterSymbols),
@@ -424,23 +447,170 @@ function abbreviationsSubRule(cp: readonly number[], prep: Prepared, claims: Cla
   }
 }
 
-/** N5 — 3.7 `beforeUnits`. Converts an existing space; never inserts one (§7.2). */
+/** nbsp.md §3.7 step 5.1: what may stand left of a number that N5 inserts or deletes beside. */
+const NUMBER_PREFIXES = new Set([0x2b, 0xb1, 0xd7, 0x2212, 0x7e, 0x2248, 0x3c, 0x3e, 0x2060]);
+const HYPHEN_MINUS = 0x2d;
+const NON_BREAKING_HYPHEN = 0x2011;
+const LOW_LINE = 0x5f;
+const COMMA = 0x2c;
+const WORD_JOINER = 0x2060;
+
+/** ranges.md §3.2a `CLOSED-SYMBOL`, mirrored (this rule does not depend on `ranges`). */
+function isClosedSymbol(cp: number): boolean {
+  return (
+    cp === 0x24 ||
+    (cp >= 0xa2 && cp <= 0xa5) ||
+    (cp >= 0x20a0 && cp <= 0x20cf) ||
+    cp === 0x25 ||
+    cp === 0x2030 ||
+    cp === 0x2031 ||
+    cp === 0xb0
+  );
+}
+
+/** dashes.md §3.1 `DASH` ∪ `INERT-DASH`. */
+function isAnyDash(cp: number): boolean {
+  return (
+    cp === 0x2d ||
+    cp === 0x2010 ||
+    cp === 0x2013 ||
+    cp === 0x2014 ||
+    cp === 0x2212 ||
+    cp === 0xad ||
+    cp === 0x2011 ||
+    cp === 0x2012 ||
+    cp === 0x2015 ||
+    cp === 0xfe58 ||
+    cp === 0xfe63 ||
+    cp === 0xff0d
+  );
+}
+
+/** §3.7 step 5.3: the first code point past a run of non-breaking-line spaces and joiners. */
+function nearestBeyond(cp: readonly number[], from: number, step: 1 | -1): number {
+  let i = from;
+  while (i >= 0 && i < cp.length) {
+    const c = cp[i] as number;
+    if (c === WORD_JOINER || (isSpaceLike(c) && !isBreak(c))) {
+      i += step;
+      continue;
+    }
+    return c;
+  }
+  return NONE;
+}
+
+/**
+ * Start of the number whose last digit is at `end`, extended over a decimal or thousands
+ * separator (§3.7 step 5.1).
+ */
+function numberStart(cp: readonly number[], end: number): number {
+  let b = end;
+  while (b - 1 >= 0 && isDigit(cp[b - 1] as number)) b -= 1;
+  while ((at(cp, b - 1) === COMMA || at(cp, b - 1) === FULL_STOP) && isDigit(at(cp, b - 2))) {
+    b -= 2;
+    while (b - 1 >= 0 && isDigit(cp[b - 1] as number)) b -= 1;
+  }
+  return b;
+}
+
+function numberStartIsClean(cp: readonly number[], prep: Prepared, b: number): boolean {
+  const c = at(cp, b - 1);
+  if (c === NONE || isSpaceLike(c) || isOpenish(prep, c) || isSentenceDash(c)) return true;
+  if (NUMBER_PREFIXES.has(c)) return true;
+  if (c !== HYPHEN_MINUS) return false;
+  const before = at(cp, b - 2);
+  return before === NONE || isSpaceLike(before) || isOpenish(prep, before);
+}
+
+/** `SPACE` ∪ `NOBREAK-SPACE` (symbols.md §3.1): U+0020, U+00A0, U+202F. */
+function isMulSpace(cp: number): boolean {
+  return cp === SPACE || cp === NBSP || cp === NNBSP;
+}
+
+/** §3.7 step 5.5: `DIGIT [space] MUL-LETTER [space]` immediately before the number start `b`. */
+function isRightOperandOfMultiplication(cp: readonly number[], b: number): boolean {
+  let i = b - 1;
+  if (isMulSpace(at(cp, i))) i -= 1;
+  const c = at(cp, i);
+  if (c !== 0x78 && c !== 0x58 && c !== 0x445 && c !== 0x425) return false;
+  i -= 1;
+  if (isMulSpace(at(cp, i))) i -= 1;
+  return isDigit(at(cp, i));
+}
+
+/**
+ * N5 — 3.7. `beforeUnits` converts an existing space, `spacedUnits` converts and inserts,
+ * `closedUnits` deletes. The longest entry across the three lists wins at `a`.
+ */
 function unitsSubRule(cp: readonly number[], prep: Prepared, claims: Claims): void {
   if (prep.units.length === 0) return;
   for (let a = 0; a < cp.length; a += 1) {
-    const w = longestMatch(prep.units, cp, a, matchExact);
-    if (w === undefined) continue;
-    const k = w.length;
+    let entry: UnitEntry | undefined;
+    for (const candidate of prep.units) {
+      if (matchExact(cp, a, candidate.w)) {
+        entry = candidate;
+        break;
+      }
+    }
+    if (entry === undefined) continue;
+    const k = entry.w.length;
     if (isAlnum(at(cp, a + k))) continue;
     const left = at(cp, a - 1);
-    if (left === NBSP) continue;
-    if (left !== SPACE) continue;
-    if (!isDigit(at(cp, a - 2))) continue;
-    let b = a - 2;
+
+    if (entry.kind === "before") {
+      if (left === NBSP) continue;
+      if (left !== SPACE) continue;
+      if (!isDigit(at(cp, a - 2))) continue;
+      let b = a - 2;
+      while (b - 1 >= 0 && isDigit(cp[b - 1] as number)) b -= 1;
+      // The letter guard: `H2 O`, `A4`, `MP3` are not measurements.
+      if (isLetter(at(cp, b - 1))) continue;
+      claimConversion(claims, a - 1, NBSP);
+      continue;
+    }
+
+    const isClosed = entry.kind === "closed";
+    const isSeparated = left === SPACE || left === NBSP || (isClosed && left === NNBSP);
+    const isTouching = isDigit(left);
+    if (!isSeparated && !(isTouching && !isClosed)) continue;
+    if (!isClosed && left === NBSP) continue;
+    const end = isSeparated ? a - 2 : a - 1;
+    if (!isDigit(at(cp, end))) continue;
+    let b = end;
     while (b - 1 >= 0 && isDigit(cp[b - 1] as number)) b -= 1;
-    // The letter guard: `H2 O`, `A4`, `MP3` are not measurements.
     if (isLetter(at(cp, b - 1))) continue;
-    claimConversion(claims, a - 1, NBSP);
+
+    // Converting an existing space keeps `beforeUnits`' behaviour; the guards below protect
+    // only what N5 would otherwise insert or delete (§3.7 step 5).
+    if (!isClosed && isSeparated) {
+      if (left === SPACE) claimConversion(claims, a - 1, NBSP);
+      continue;
+    }
+    const start = numberStart(cp, end);
+    if (!numberStartIsClean(cp, prep, start)) continue;
+    // A closed-up symbol beside a dash decides whether `ranges` and `dashes` read the token as a
+    // range; editing the space between the number and the symbol would change that verdict on
+    // the next pass (§3.7 step 5.3).
+    if (
+      isClosedSymbol(entry.w[0] as number) &&
+      (isAnyDash(nearestBeyond(cp, start - 1, -1)) || isAnyDash(nearestBeyond(cp, a + k, 1)))
+    ) {
+      continue;
+    }
+    if (!isClosed && isRightOperandOfMultiplication(cp, start)) continue;
+    const next = at(cp, a + k);
+    if (next === HYPHEN_MINUS || next === NON_BREAKING_HYPHEN || next === LOW_LINE) continue;
+    if (next === FULL_STOP && isAlnum(at(cp, a + k + 1))) continue;
+
+    if (isClosed) {
+      if (next === SPACE && isDigit(at(cp, a + k + 1))) continue;
+      if (claims[a - 1] === undefined) {
+        claims[a - 1] = { start: a - 1, end: a, replacement: [], ruleId: "nbsp" };
+      }
+    } else {
+      claimInsertion(claims, a, NBSP);
+    }
   }
 }
 
