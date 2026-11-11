@@ -4,6 +4,7 @@ import { dashesRule } from "./dashes.js";
 import { ellipsisRule } from "./ellipsis.js";
 import { hyphenRule } from "./hyphen.js";
 import { nbspRule } from "./nbsp.js";
+import { quotePunctuationRule } from "./quote-punctuation.js";
 import { quotesRule } from "./quotes.js";
 import { rangesRule } from "./ranges.js";
 import { spacesRule } from "./spaces.js";
@@ -35,14 +36,15 @@ export const RULE_ORDER: readonly RuleId[] = [
   "dashes",
   "hyphen",
   "quotes",
+  "quote-punctuation",
   "apostrophe",
   "symbols",
   "nbsp",
 ];
 
 /**
- * From the `default` field of spec/rules/order.json. Every rule except `ranges` defaults on;
- * `ranges` (spec 0.5.0) is the first rule to default off — see `rule-runner.ts`'s `planRules`
+ * From the `default` field of spec/rules/order.json. Every rule except `ranges` and
+ * `quote-punctuation` (spec 1.21.0) defaults on; `ranges` (spec 0.5.0) was the first to default off — see `rule-runner.ts`'s `planRules`
  * for how `Options.rules` resolves a default-off rule's explicit `true`.
  */
 export const RULE_DEFAULTS: Readonly<Record<RuleId, boolean>> = {
@@ -52,6 +54,7 @@ export const RULE_DEFAULTS: Readonly<Record<RuleId, boolean>> = {
   dashes: true,
   hyphen: true,
   quotes: true,
+  "quote-punctuation": false,
   apostrophe: true,
   symbols: true,
   nbsp: true,
@@ -65,6 +68,7 @@ export const RULES: Readonly<Partial<Record<RuleId, Rule>>> = {
   dashes: dashesRule,
   hyphen: hyphenRule,
   quotes: quotesRule,
+  "quote-punctuation": quotePunctuationRule,
   apostrophe: apostropheRule,
   symbols: symbolsRule,
   nbsp: nbspRule,

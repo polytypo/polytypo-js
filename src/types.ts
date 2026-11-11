@@ -15,6 +15,7 @@ export type RuleId =
   | "ranges"
   | "hyphen"
   | "quotes"
+  | "quote-punctuation"
   | "apostrophe"
   | "symbols"
   | "nbsp";
@@ -41,8 +42,8 @@ export interface Options {
    */
   frontmatterKeys?: readonly string[];
   /**
-   * Per-rule override, keyed by `RuleId`. For a default-on rule (every rule except `ranges`),
-   * `false` disables it and `true` is a no-op. For `ranges` — off by default (spec 0.5.0) —
+   * Per-rule override, keyed by `RuleId`. For a default-on rule (every rule except `ranges` and `quote-punctuation`),
+   * `false` disables it and `true` is a no-op. For `ranges` (spec 0.5.0) and `quote-punctuation` (spec 1.21.0) — off by default —
    * `true` explicitly opts in and `false` (or omitting the key) leaves it disabled. Absence of a
    * key always means "use that rule's own default", never "off".
    */
@@ -127,6 +128,12 @@ export interface LocaleData {
      * closed set of attaching fragments is classified exactly as spec 1.3.1 classified it.
      */
     readonly elisionClitics: ElisionClitics;
+    /**
+     * `quotes.punctuationPlacement` — spec/rules/quote-punctuation.md §2 (spec 1.21.0). `"inside"`:
+     * the locale's cited convention puts a comma or full stop before the closing primary mark.
+     * `"none"`: the `quote-punctuation` rule does nothing for this locale.
+     */
+    readonly punctuationPlacement: "inside" | "none";
   };
   readonly dash: {
     readonly parenthetical:
@@ -168,6 +175,7 @@ export interface LocaleSource {
    * both read is `dash`. */
   readonly rule:
     | "quotes"
+    | "quote-punctuation"
     | "dashes"
     | "ranges"
     | "ellipsis"

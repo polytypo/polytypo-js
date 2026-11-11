@@ -65,9 +65,11 @@ const specVersion = readFileSync(join(root, "spec", "VERSION"), "utf8").trim();
 const QUOTE_INNER_SPACE = ["none", "nbsp", "narrow-nbsp"];
 const PARENTHETICAL = ["em-tight", "em-spaced", "em-paired", "en-tight", "en-spaced", "none"];
 const RANGE = ["em-tight", "em-spaced", "en-tight", "en-spaced", "none"];
+const PUNCTUATION_PLACEMENT = ["inside", "none"];
 const INITIAL_BINDING = ["none", "chain", "single"];
 const SOURCE_RULES = [
   "quotes",
+  "quote-punctuation",
   "dashes",
   "ranges",
   "ellipsis",
@@ -170,6 +172,9 @@ function checkLocale(file, data) {
   if (!isPlainObject(data.quotes)) fail(`${file}: \`quotes\` must be an object`);
   const elisionIdioms = checkElisionIdioms(file, data.quotes.elisionIdioms);
   const elisionClitics = checkElisionClitics(file, data.quotes.elisionClitics);
+  if (!PUNCTUATION_PLACEMENT.includes(data.quotes.punctuationPlacement)) {
+    fail(`${file}: quotes.punctuationPlacement must be one of ${PUNCTUATION_PLACEMENT.join(", ")}`);
+  }
   if (!isPlainObject(data.dash)) fail(`${file}: \`dash\` must be an object`);
   if (!PARENTHETICAL.includes(data.dash.parenthetical)) {
     fail(`${file}: dash.parenthetical must be one of ${PARENTHETICAL.join(", ")}`);
@@ -224,6 +229,7 @@ function checkLocale(file, data) {
       secondary: checkQuotePair(file, "quotes.secondary", data.quotes.secondary),
       elisionIdioms,
       elisionClitics,
+      punctuationPlacement: data.quotes.punctuationPlacement,
     },
     dash: { parenthetical: data.dash.parenthetical, range: data.dash.range },
     ellipsis: { abbreviatedAfterTerminal: data.ellipsis.abbreviatedAfterTerminal },
