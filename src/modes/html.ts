@@ -119,10 +119,26 @@ function isParent(node: Node): node is ParentNode {
   return "childNodes" in node;
 }
 
+/**
+ * modes.md 3.6 (spec 1.23.0): a text node of only U+0009, U+000A, U+000C, U+000D and U+0020 that
+ * holds a line break is not a span, so the gap around it carries the raw line break and 3.2
+ * picks the line marker. Pretty-printed markup then reads as `text` mode reads the same lines.
+ */
+function isLineBreakWhitespace(source: string, start: number, end: number): boolean {
+  let hasLineBreak = false;
+  for (let i = start; i < end; i += 1) {
+    const c = source.charCodeAt(i);
+    if (c === 0x0a || c === 0x0c || c === 0x0d) hasLineBreak = true;
+    else if (c !== 0x09 && c !== 0x20) return false;
+  }
+  return hasLineBreak;
+}
+
 function collect(node: Node, source: string, spans: Span[]): void {
   if (node.nodeName === "#text") {
     const location = node.sourceCodeLocation;
     if (location === undefined || location === null) return;
+    if (isLineBreakWhitespace(source, location.startOffset, location.endOffset)) return;
     for (const span of splitCharacterReferences(source, location.startOffset, location.endOffset)) {
       spans.push(span);
     }
