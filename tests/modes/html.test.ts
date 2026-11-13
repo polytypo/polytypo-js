@@ -139,3 +139,29 @@ describe("the round-trip guarantee (modes.md 4)", () => {
     expect(html(source)).toBe("<p title='\u{1F600}'>\u{1F600} a…b \u{1F600}</p>");
   });
 });
+
+describe("html tags the parser ignores are outside every span (spec/rules/modes.md 3.6, 1.23.1)", () => {
+  it("splits the text run around an ignored tag", () => {
+    expect(spanText("<p>dogs'</span> bones</p>")).toEqual(["dogs'", " bones"]);
+    expect(spanText('<p>a</p>b</p title="q"> c')).toEqual(["a", "b", " c"]);
+    expect(spanText("<p>a</>b</p>")).toEqual(["a", "b"]);
+    expect(spanText("<p>a<body class=x>b</p>")).toEqual(["a", "b"]);
+  });
+
+  it("reads attributes with the tokenizer's quoting rules", () => {
+    // a quote opens a value only after `=` that follows a name
+    expect(spanText("<p>a</x ='b>c\"</p>")).toEqual(["a", 'c"']);
+    expect(spanText('<p>a</b x=y=" >c</p>')).toEqual(["a", "c"]);
+    expect(spanText('<p>a</b==">c</p>')).toEqual(["a", "c"]);
+    expect(spanText('<p>a</b/="x>c</p>')).toEqual(["a", "c"]);
+    expect(spanText('<p>a</b x="1>2">c</p>')).toEqual(["a", "c"]);
+  });
+
+  it("leaves a `<` that begins no tag as text", () => {
+    expect(spanText("<p>a < b <3 c</p>")).toEqual(["a < b <3 c"]);
+  });
+
+  it("keeps text-only parents whole, where `<` is data", () => {
+    expect(spanText("<title>a<b>c</title>")).toEqual(["a<b>c"]);
+  });
+});

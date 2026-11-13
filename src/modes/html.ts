@@ -134,13 +134,130 @@ function isLineBreakWhitespace(source: string, start: number, end: number): bool
   return hasLineBreak;
 }
 
-function collect(node: Node, source: string, spans: Span[]): void {
+const LESS_THAN = 0x3c;
+const SOLIDUS = 0x2f;
+const GREATER_THAN = 0x3e;
+const EQUALS = 0x3d;
+
+function isAsciiAlpha(unit: number): boolean {
+  return (unit >= 0x41 && unit <= 0x5a) || (unit >= 0x61 && unit <= 0x7a);
+}
+
+function isTagSpace(unit: number): boolean {
+  return unit === 0x09 || unit === 0x0a || unit === 0x0c || unit === 0x0d || unit === 0x20;
+}
+
+/**
+ * The offset just past the tag that starts at `at`, or -1 when no tag starts there. Follows the
+ * HTML tokenizer: `<` plus a letter, `</` plus a letter, or `</>`. A quote opens a value only in
+ * the before-attribute-value state, reached by an `=` that follows an attribute name; an `=` that
+ * begins a name, or sits inside an unquoted value, is data.
+ */
+function tagEnd(source: string, at: number, limit: number): number {
+  if (source.charCodeAt(at) !== LESS_THAN) return -1;
+  let i = at + 1;
+  if (i >= limit) return -1;
+  if (source.charCodeAt(i) === SOLIDUS) {
+    i += 1;
+    if (i >= limit) return -1;
+    if (source.charCodeAt(i) === GREATER_THAN) return i + 1;
+  }
+  if (!isAsciiAlpha(source.charCodeAt(i))) return -1;
+  // tag name
+  while (i < limit) {
+    const c = source.charCodeAt(i);
+    if (isTagSpace(c) || c === SOLIDUS || c === GREATER_THAN) break;
+    i += 1;
+  }
+  while (i < limit) {
+    // before attribute name
+    let c = source.charCodeAt(i);
+    if (isTagSpace(c) || c === SOLIDUS) {
+      i += 1;
+      continue;
+    }
+    if (c === GREATER_THAN) return i + 1;
+    // attribute name: an `=` first in the name is part of it
+    i += 1;
+    while (i < limit) {
+      c = source.charCodeAt(i);
+      if (isTagSpace(c) || c === SOLIDUS || c === GREATER_THAN || c === EQUALS) break;
+      i += 1;
+    }
+    // after attribute name
+    while (i < limit && isTagSpace(source.charCodeAt(i))) i += 1;
+    if (i >= limit) return -1;
+    c = source.charCodeAt(i);
+    if (c === GREATER_THAN) return i + 1;
+    if (c !== EQUALS) continue;
+    // before attribute value
+    i += 1;
+    while (i < limit && isTagSpace(source.charCodeAt(i))) i += 1;
+    if (i >= limit) return -1;
+    c = source.charCodeAt(i);
+    if (c === GREATER_THAN) return i + 1;
+    if (c === 0x22 || c === 0x27) {
+      const close = source.indexOf(c === 0x22 ? '"' : "'", i + 1);
+      if (close === -1 || close >= limit) return -1;
+      i = close + 1;
+      continue;
+    }
+    while (i < limit) {
+      c = source.charCodeAt(i);
+      if (isTagSpace(c) || c === GREATER_THAN) break;
+      i += 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * modes.md 3.6 (spec 1.23.1): a tag the parser ignores is still a tag in the source, and parse5
+ * merges the text on either side of it into one node. Splitting the run at every tag-shaped token
+ * keeps the tag outside every span and puts it in the gap, where 3.2 chooses the marker.
+ */
+function textPieces(source: string, start: number, end: number): Array<[number, number]> {
+  const pieces: Array<[number, number]> = [];
+  let cursor = start;
+  let i = start;
+  while (i < end) {
+    if (source.charCodeAt(i) === LESS_THAN) {
+      const stop = tagEnd(source, i, end);
+      if (stop > 0) {
+        if (i > cursor) pieces.push([cursor, i]);
+        cursor = stop;
+        i = stop;
+        continue;
+      }
+    }
+    i += 1;
+  }
+  if (end > cursor) pieces.push([cursor, end]);
+  return pieces;
+}
+
+// Their text is character data, not markup: `<` begins no tag inside them (HTML tokenizer RCDATA,
+// RAWTEXT and PLAINTEXT states), so textPieces must not look for one.
+const TEXT_ONLY_PARENTS = new Set([
+  "title",
+  "xmp",
+  "iframe",
+  "noembed",
+  "noframes",
+  "noscript",
+  "plaintext",
+]);
+
+function collect(node: Node, source: string, spans: Span[], isTextOnly = false): void {
   if (node.nodeName === "#text") {
     const location = node.sourceCodeLocation;
     if (location === undefined || location === null) return;
-    if (isLineBreakWhitespace(source, location.startOffset, location.endOffset)) return;
-    for (const span of splitCharacterReferences(source, location.startOffset, location.endOffset)) {
-      spans.push(span);
+    const pieces = isTextOnly
+      ? ([[location.startOffset, location.endOffset]] as Array<[number, number]>)
+      : textPieces(source, location.startOffset, location.endOffset);
+    for (const [from, to] of pieces) {
+      if (isLineBreakWhitespace(source, from, to)) continue;
+      for (const span of splitCharacterReferences(source, from, to)) spans.push(span);
     }
     return;
   }
@@ -157,7 +274,8 @@ function collect(node: Node, source: string, spans: Span[]): void {
   }
 
   if (!isParent(node)) return;
-  for (const child of node.childNodes) collect(child, source, spans);
+  const textOnly = "tagName" in node && TEXT_ONLY_PARENTS.has(node.tagName);
+  for (const child of node.childNodes) collect(child, source, spans, textOnly);
 }
 
 /**
