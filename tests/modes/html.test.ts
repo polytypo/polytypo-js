@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { htmlSpans, splitCharacterReferences } from "../../src/modes/html";
-import { transform } from "../../src/index";
+import { transform, SKIPPED_ELEMENTS } from "../../src/index";
+import { SKIPPED_ELEMENTS as htmlEntrySkipped } from "../../src/index.html";
 
 const html = (input: string, locale = "en-US"): string =>
   transform(input, { locale, mode: "html" });
@@ -163,5 +164,35 @@ describe("html tags the parser ignores are outside every span (spec/rules/modes.
 
   it("keeps text-only parents whole, where `<` is data", () => {
     expect(spanText("<title>a<b>c</title>")).toEqual(["a<b>c"]);
+  });
+});
+
+describe("published skip list (spec/rules/modes.md 3.6)", () => {
+  it("lists the ten names in spec order, from both entry points", () => {
+    expect(SKIPPED_ELEMENTS).toEqual([
+      "code",
+      "pre",
+      "kbd",
+      "samp",
+      "var",
+      "script",
+      "style",
+      "textarea",
+      "svg",
+      "math",
+    ]);
+    expect(htmlEntrySkipped).toBe(SKIPPED_ELEMENTS);
+  });
+
+  it("cannot be modified through the reference", () => {
+    expect(Object.isFrozen(SKIPPED_ELEMENTS)).toBe(true);
+    expect(() => (SKIPPED_ELEMENTS as string[]).push("p")).toThrow(TypeError);
+  });
+
+  it("is the list the mode skips by: every name leaves its subtree alone", () => {
+    for (const tag of SKIPPED_ELEMENTS) {
+      const source = `<p>a...b</p><${tag}>c...d</${tag}>`;
+      expect(html(source), tag).toBe(`<p>a…b</p><${tag}>c...d</${tag}>`);
+    }
   });
 });

@@ -70,6 +70,15 @@ transform(`<a title="test... wait">Wait... she said "go on."</a>`, { locale: "en
 // <a title="test... wait">Wait… she said “go on.”</a>
 ```
 
+`html` mode leaves ten elements alone, with everything inside them: `code`, `pre`, `kbd`, `samp`,
+`var`, `script`, `style`, `textarea`, `svg` and `math`. If you walk a document with a parser of your
+own, read the list instead of copying it. It is a frozen array, exported from `polytypo/html` and
+`polytypo`:
+
+```ts
+import { SKIPPED_ELEMENTS } from "polytypo/html";
+```
+
 `yaml` mode is the one that asks something of you, and it asks for a reason. YAML is a data format
 with prose in some of it, so you name the keys whose values are prose; there is no default and no
 guess:

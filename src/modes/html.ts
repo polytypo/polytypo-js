@@ -13,7 +13,7 @@ type ParentNode = DefaultTreeAdapterMap["parentNode"];
  * the expression means. Everything not listed is processable, **including unknown and custom
  * elements**: guessing from a tag name is exactly the heuristic that diverges across runtimes.
  */
-const SKIPPED_ELEMENTS: ReadonlySet<string> = new Set([
+export const SKIPPED_ELEMENTS: readonly string[] = Object.freeze([
   "code",
   "pre",
   "kbd",
@@ -26,8 +26,10 @@ const SKIPPED_ELEMENTS: ReadonlySet<string> = new Set([
   "math",
 ]);
 
+const SKIPPED_ELEMENT_SET: ReadonlySet<string> = new Set(SKIPPED_ELEMENTS);
+
 export function isSkippedElement(tagName: string): boolean {
-  return SKIPPED_ELEMENTS.has(tagName);
+  return SKIPPED_ELEMENT_SET.has(tagName);
 }
 
 const AMPERSAND = 0x26;

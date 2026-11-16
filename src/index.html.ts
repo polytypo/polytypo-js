@@ -31,6 +31,7 @@ export function analyze(input: string, options: HtmlOptions): Change[] {
   return analyzeHtmlPipeline(input, given);
 }
 
+export { SKIPPED_ELEMENTS } from "./modes/html.js";
 export { PolytypoError } from "./errors.js";
 export type { PolytypoErrorCode } from "./errors.js";
 export type { Change } from "./engine/origin.js";
