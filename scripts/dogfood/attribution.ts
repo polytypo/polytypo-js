@@ -35,6 +35,7 @@ import { transform } from "../../src/index.js";
 export const RULE_IDS: readonly RuleId[] = [
   "spaces",
   "ellipsis",
+  "ranges",
   "dashes",
   "hyphen",
   "quotes",
@@ -47,7 +48,7 @@ export type AttributionCategory =
   "single-rule" | "multi-rule-composition" | "interaction-candidate" | "ambiguous" | "unknown";
 
 export interface ReviewChangeAttribution {
-  /** Rule ids whose isolated run (that rule alone, the other seven disabled) produced *some*
+  /** Rule ids whose isolated run (that rule alone, the other eight disabled) produced *some*
    * `AtomicEdit` overlapping this review change's exact code-point range. Overlap alone is not
    * evidence of anything beyond "worth checking" -- see `category`. */
   overlappingIsolatedRules: RuleId[];
@@ -105,9 +106,9 @@ export interface ReviewChangeForAttribution {
 
 /**
  * For every entry in `reviewChanges` (already computed from `original` vs. the real full-pipeline
- * output), determines an `AttributionCategory`. Runs exactly 8 single-rule `transform()` calls
+ * output), determines an `AttributionCategory`. Runs exactly 9 single-rule `transform()` calls
  * (one per rule id, cached), never a per-review-change or combinatorial number of calls -- the
- * union-reproduction test below is pure text slicing over those 8 cached isolated `AtomicEdit`
+ * union-reproduction test below is pure text slicing over those 9 cached isolated `AtomicEdit`
  * sets, not additional `transform()` calls.
  */
 export function attributeReviewChanges(

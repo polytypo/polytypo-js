@@ -42,9 +42,10 @@ export interface Options {
    */
   frontmatterKeys?: readonly string[];
   /**
-   * Per-rule override, keyed by `RuleId`. For a default-on rule (every rule except `ranges` and `quote-punctuation`),
-   * `false` disables it and `true` is a no-op. For `ranges` (spec 0.5.0) and `quote-punctuation` (spec 1.21.0) — off by default —
-   * `true` explicitly opts in and `false` (or omitting the key) leaves it disabled. Absence of a
+   * Per-rule override, keyed by `RuleId`. For a default-on rule (every rule except `quote-punctuation`),
+   * `false` disables it and `true` is a no-op. For `quote-punctuation` (spec 1.21.0) — off by default —
+   * `true` explicitly opts in and `false` (or omitting the key) leaves it disabled. `ranges` was
+   * off by default until spec 1.33.0 and is now on; `ranges: false` opts out. Absence of a
    * key always means "use that rule's own default", never "off".
    */
   rules?: Partial<Record<RuleId, boolean>>;

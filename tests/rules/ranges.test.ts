@@ -30,18 +30,17 @@ const ru = localeOf("ru"); // range em-tight
 const fr = localeOf("fr"); // range none
 
 describe("ranges — option resolution: absent, false and true", () => {
-  it("absent `rules` leaves ranges off (spec 0.5.0 default)", () => {
-    expect(transform("5-10", { locale: "en-US" })).toBe("5-10");
-    expect(transform("Figure 5-10", { locale: "en-US" })).toBe("Figure 5-10");
-    expect(transform("7-11", { locale: "en-US" })).toBe("7-11");
-    expect(transform("9-11", { locale: "en-US" })).toBe("9-11");
+  it("absent `rules` leaves ranges on (spec 1.33.0 default)", () => {
+    expect(transform("5-10", { locale: "en-US" })).toBe(`5${WJ}${EN}${WJ}10`);
+    expect(transform("5-10", { locale: "en-US" })).toBe(
+      transform("5-10", { locale: "en-US", rules: { ranges: true } }),
+    );
   });
 
-  it("explicit `ranges: false` leaves ranges off, same as absent", () => {
-    expect(transform("5-10", { locale: "en-US", rules: { ranges: false } })).toBe("5-10");
-    expect(transform("5-10", { locale: "en-US", rules: { ranges: false } })).toBe(
-      transform("5-10", { locale: "en-US" }),
-    );
+  it("explicit `ranges: false` opts out", () => {
+    for (const input of ["5-10", "Figure 5-10", "7-11", "9-11"]) {
+      expect(transform(input, { locale: "en-US", rules: { ranges: false } })).toBe(input);
+    }
   });
 
   it("explicit `ranges: true` turns the rule on", () => {
@@ -65,19 +64,19 @@ describe("ranges — option resolution: absent, false and true", () => {
   });
 });
 
-describe("ranges — safe default: bare numeric forms and compound labels are all no-ops", () => {
-  it("bare numeric forms are untouched with default options, in every locale", () => {
+describe("ranges — opt-out: bare numeric forms and compound labels are no-ops", () => {
+  it("bare numeric forms are untouched with `ranges: false`, in every locale", () => {
     for (const tag of Object.keys(LOCALES)) {
       for (const input of ["5-10", "7-11", "9-11", "0-60", "€30-80", "4-8×"]) {
-        expect(transform(input, { locale: tag })).toBe(input);
+        expect(transform(input, { locale: tag, rules: { ranges: false } })).toBe(input);
       }
     }
   });
 
-  it("compound labels are untouched with default options, in every locale", () => {
+  it("compound labels are untouched with `ranges: false`, in every locale", () => {
     for (const tag of Object.keys(LOCALES)) {
       for (const input of ["Figure 5-10", "Figure 3-7", "Table 3-12", "Section 2-14"]) {
-        expect(transform(input, { locale: tag })).toBe(input);
+        expect(transform(input, { locale: tag, rules: { ranges: false } })).toBe(input);
       }
     }
   });
@@ -378,13 +377,12 @@ describe("ranges — closed-up symbols on both members (ranges.md §3.2a, spec 1
   it("takes the spaced token away from dashes — ranges.md §3.2a's accepted cost", () => {
     // Through spec 1.2.0 `dashes` converted this with DEFAULT options, because the right flank
     // was a symbol and not a digit. It is a range candidate now, so `dashes` declines it
-    // unconditionally and nothing touches it unless the caller enables `ranges`.
+    // unconditionally; since 1.33.0 `ranges` is on by default and converts it, and nothing
+    // touches it when the caller sets `ranges: false`.
     const cp = toCodePoints("$15 - $20");
     expect(dashesRule.apply({ cp, locale: enUS, mode: "text", narrowTarget: 0x202f })).toEqual([]);
-    expect(transform("$15 - $20", { locale: "en-US" })).toBe("$15 - $20");
-    expect(transform("$15 - $20", { locale: "en-US", rules: { ranges: true } })).toBe(
-      `$15${WJ}${EN}${WJ}$20`,
-    );
+    expect(transform("$15 - $20", { locale: "en-US", rules: { ranges: false } })).toBe("$15 - $20");
+    expect(transform("$15 - $20", { locale: "en-US" })).toBe(`$15${WJ}${EN}${WJ}$20`);
   });
 
   it("leaves an unmatched pair with dashes, which still converts it by default", () => {

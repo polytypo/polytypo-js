@@ -8,11 +8,9 @@ import { applyEditsToOrigin, recordChanges, type Change } from "./origin.js";
  * The rules that will run, in spec order. An explicit `false` always disables a rule and an
  * absent key always means "use that rule's own default" (RULE_DEFAULTS in registry.ts) —
  * unchanged since spec 0.4.1. Spec 0.5.0 adds the other half: an explicit `true` on a
- * default-off rule (`ranges`, the first one) turns it on. This is not a "one option is now
- * opt-in, opt-out for the rest" special case — it is the same single rule applied uniformly:
- * `override ?? RULE_DEFAULTS[id]`. For every rule but `ranges`, `RULE_DEFAULTS[id]` is already
- * `true`, so an explicit `true` there was always a no-op (tests/engine/pipeline.test.ts still
- * asserts that), and the only thing that changes is which rules *can* have a meaningful `true`.
+ * default-off rule (today `quote-punctuation`) turns it on. This is the same single rule applied
+ * uniformly: `override ?? RULE_DEFAULTS[id]`. For every default-on rule an explicit `true` is a
+ * no-op (tests/engine/pipeline.test.ts asserts that).
  * Disabling a rule removes it from the sequence and never reorders the rest (ARCHITECTURE.md
  * 4.5).
  */

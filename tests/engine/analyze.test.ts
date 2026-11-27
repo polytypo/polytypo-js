@@ -103,12 +103,12 @@ describe("analyze (analyze.md)", () => {
       expect(ids).toContain("ellipsis");
     });
 
-    it("never reports ranges unless it was turned on", () => {
+    it("reports ranges by default and never when it was turned off", () => {
       const input = "chapters 3-5";
-      expect(analyze(input, { locale: "en-US" }).map((c) => c.ruleId)).not.toContain("ranges");
+      expect(analyze(input, { locale: "en-US" }).map((c) => c.ruleId)).toContain("ranges");
       expect(
-        analyze(input, { locale: "en-US", rules: { ranges: true } }).map((c) => c.ruleId),
-      ).toContain("ranges");
+        analyze(input, { locale: "en-US", rules: { ranges: false } }).map((c) => c.ruleId),
+      ).not.toContain("ranges");
     });
   });
 

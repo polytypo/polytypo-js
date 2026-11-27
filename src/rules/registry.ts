@@ -43,14 +43,14 @@ export const RULE_ORDER: readonly RuleId[] = [
 ];
 
 /**
- * From the `default` field of spec/rules/order.json. Every rule except `ranges` and
- * `quote-punctuation` (spec 1.21.0) defaults on; `ranges` (spec 0.5.0) was the first to default off — see `rule-runner.ts`'s `planRules`
- * for how `Options.rules` resolves a default-off rule's explicit `true`.
+ * From the `default` field of spec/rules/order.json. Every rule except `quote-punctuation`
+ * (spec 1.21.0) defaults on; `ranges` (spec 0.5.0) defaulted off until spec 1.33.0 — see
+ * `rule-runner.ts`'s `planRules` for how `Options.rules` resolves a default-off rule's explicit `true`.
  */
 export const RULE_DEFAULTS: Readonly<Record<RuleId, boolean>> = {
   spaces: true,
   ellipsis: true,
-  ranges: false,
+  ranges: true,
   dashes: true,
   hyphen: true,
   quotes: true,

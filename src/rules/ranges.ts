@@ -16,8 +16,8 @@ import {
 } from "./dash-shared.js";
 
 /**
- * `ranges` — spec/rules/ranges.md (spec 0.5.0), order 25. Explicit opt-in: off by default
- * (RULE_DEFAULTS in registry.ts). Split out of `dashes` (spec 0.5.0) — see ranges.md 1 and
+ * `ranges` — spec/rules/ranges.md (spec 0.5.0), order 25. On by default since spec 1.33.0
+ * (RULE_DEFAULTS in registry.ts); it was opt-in before. Split out of `dashes` (spec 0.5.0) — see ranges.md 1 and
  * dashes.md 7.11 for why this is opt-in rather than a bounded structural fix: separating a
  * genuine numeric range (`5-10`) from a compound label sharing the identical shape (`Figure
  * 5-10`) needs the preceding word, which is exactly the open-ended, per-locale context this
