@@ -43,6 +43,11 @@ export const NARROW: ReadonlySet<number> = new Set([
   0x27, 0x2018, 0x2019, 0x201a, 0x201b, 0x2039, 0x203a,
 ]);
 
+/** Same membership as {@link NARROW}, without a hash lookup per code point. */
+export function isNarrow(cp: number): boolean {
+  return cp === 0x27 || (cp >= 0x2018 && cp <= 0x201b) || cp === 0x2039 || cp === 0x203a;
+}
+
 /** quotes.md 3.1 INLINE-SPACE — deliberately excludes BREAK, so this shape never crosses a
  * line/span boundary (modes.md 3.3), matching the existing elisionIdioms anchor exactly. */
 const INLINE_SPACE: ReadonlySet<number> = new Set([
@@ -123,7 +128,7 @@ export function computeIdiomMatchedIndices(
 
   for (let i = 0; i < n; i += 1) {
     const g = at(arr, i);
-    if (!NARROW.has(g)) continue;
+    if (!isNarrow(g)) continue;
 
     const lLit = i > 0 ? at(arr, i - 1) : NONE;
     if (lLit === NONE || !INLINE_SPACE.has(lLit)) continue;
@@ -141,7 +146,7 @@ export function computeIdiomMatchedIndices(
         }
       }
       if (!elidedMatches) continue;
-      if (!NARROW.has(at(arr, j))) continue;
+      if (!isNarrow(at(arr, j))) continue;
 
       const rLit = j + 1 < n ? at(arr, j + 1) : NONE;
       if (rLit === NONE || !INLINE_SPACE.has(rLit)) continue;
@@ -183,7 +188,7 @@ export function computeAmbiguousShapeIndices(cp: readonly number[]): ReadonlySet
   const n = cp.length;
 
   for (let i = 0; i < n; i += 1) {
-    if (!NARROW.has(at(cp, i))) continue;
+    if (!isNarrow(at(cp, i))) continue;
 
     const lLit = i > 0 ? at(cp, i - 1) : NONE;
     if (lLit === NONE || !INLINE_SPACE.has(lLit)) continue;
@@ -192,7 +197,7 @@ export function computeAmbiguousShapeIndices(cp: readonly number[]): ReadonlySet
     if (enclosed !== LOWER_N && enclosed !== UPPER_N) continue;
 
     const j = i + 2;
-    if (!NARROW.has(at(cp, j))) continue;
+    if (!isNarrow(at(cp, j))) continue;
 
     const rLit = j + 1 < n ? at(cp, j + 1) : NONE;
     if (rLit === NONE || !INLINE_SPACE.has(rLit)) continue;
@@ -231,7 +236,7 @@ export function computeSpanBoundaryVetoIndices(
   };
 
   for (let i = 0; i < arr.length; i += 1) {
-    if (!NARROW.has(at(arr, i))) continue;
+    if (!isNarrow(at(arr, i))) continue;
     if (at(arr, i - 1) === MARKER && runMatches(arr, i, 1, compiled.after)) {
       vetoed.add(i);
       continue;

@@ -203,6 +203,10 @@ export interface Edit {
 }
 
 export interface RuleContext {
+  /**
+   * The text so far. A rule must never mutate it: when a rule reports no edits the pipeline passes
+   * this same array on to the next rule instead of copying it.
+   */
   readonly cp: readonly number[];
   readonly locale: LocaleData;
   readonly mode: Mode;

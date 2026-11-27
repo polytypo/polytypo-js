@@ -41,22 +41,29 @@ export function validateEdits(edits: readonly Edit[], length: number, ruleId?: R
   }
 }
 
-/** Applies validated edits left to right, producing a new code-point array. */
+/**
+ * Applies validated edits left to right, producing a code-point array. With no edits the input
+ * array itself comes back, not a copy: a rule never mutates `RuleContext.cp`, nor does anything
+ * downstream of the pipeline, so sharing it is safe and saves a whole-array copy per rule.
+ */
 export function applyEdits(
   cp: readonly number[],
   edits: readonly Edit[],
   ruleId?: RuleId,
-): number[] {
+): readonly number[] {
   validateEdits(edits, cp.length, ruleId);
-  if (edits.length === 0) return cp.slice();
+  if (edits.length === 0) return cp;
 
-  const out: number[] = [];
+  let newLength = cp.length;
+  for (const edit of edits) newLength += edit.replacement.length - (edit.end - edit.start);
+  const out = new Array<number>(newLength);
   let cursor = 0;
+  let w = 0;
   for (const edit of edits) {
-    for (const value of cp.slice(cursor, edit.start)) out.push(value);
-    for (const value of edit.replacement) out.push(value);
+    for (let k = cursor; k < edit.start; k += 1) out[w++] = cp[k] as number;
+    for (const value of edit.replacement) out[w++] = value;
     cursor = edit.end;
   }
-  for (const value of cp.slice(cursor)) out.push(value);
+  for (let k = cursor; k < cp.length; k += 1) out[w++] = cp[k] as number;
   return out;
 }

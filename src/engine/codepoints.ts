@@ -7,22 +7,24 @@
  * well-formed UTF-16 still round-trips byte-for-byte instead of being silently repaired.
  */
 export function toCodePoints(input: string): number[] {
-  const out: number[] = [];
   const len = input.length;
+  const out = new Array<number>(len);
+  let w = 0;
   let i = 0;
   while (i < len) {
     const unit = input.charCodeAt(i);
     if (unit >= 0xd800 && unit <= 0xdbff && i + 1 < len) {
       const next = input.charCodeAt(i + 1);
       if (next >= 0xdc00 && next <= 0xdfff) {
-        out.push((unit - 0xd800) * 0x400 + (next - 0xdc00) + 0x10000);
+        out[w++] = (unit - 0xd800) * 0x400 + (next - 0xdc00) + 0x10000;
         i += 2;
         continue;
       }
     }
-    out.push(unit);
+    out[w++] = unit;
     i += 1;
   }
+  out.length = w;
   return out;
 }
 

@@ -67,7 +67,17 @@ const WIDE: ReadonlySet<number> = new Set([
 ]);
 
 function isQuoteMark(cp: number): boolean {
-  return WIDE.has(cp) || NARROW.has(cp);
+  if (cp < 0x22) return false;
+  return (
+    cp === 0x22 ||
+    cp === 0x27 ||
+    cp === 0xab ||
+    cp === 0xbb ||
+    (cp >= 0x2018 && cp <= 0x201f) ||
+    cp === 0x2039 ||
+    cp === 0x203a ||
+    (cp >= 0x301d && cp <= 0x301f)
+  );
 }
 
 /**
@@ -443,13 +453,28 @@ function computeRenderPlan(
 function applyRenderPlan(
   arr: readonly number[],
   plan: RenderPlan,
-): { readonly y: number[]; readonly map: readonly number[] } {
-  const y: number[] = [];
-  const map: number[] = new Array(arr.length).fill(-1);
-  for (let i = 0; i < arr.length; i += 1) {
-    if (plan.deleteIndices.has(i)) continue;
-    map[i] = y.length;
-    y.push(plan.replace.get(i) ?? (arr[i] as number));
+): { readonly y: number[]; readonly map: readonly number[] | null } {
+  if (plan.deleteIndices.size === 0) {
+    const y = arr.slice();
+    for (const [index, cp] of plan.replace) y[index] = cp;
+    return { y, map: null };
+  }
+  const n = arr.length;
+  const replaced = arr.slice();
+  for (const [index, cp] of plan.replace) replaced[index] = cp;
+  const deleted = new Uint8Array(n);
+  for (const index of plan.deleteIndices) deleted[index] = 1;
+  const y: number[] = new Array(n - plan.deleteIndices.size);
+  const map: number[] = new Array(n);
+  let w = 0;
+  for (let i = 0; i < n; i += 1) {
+    if (deleted[i] === 1) {
+      map[i] = -1;
+      continue;
+    }
+    map[i] = w;
+    y[w] = replaced[i] as number;
+    w += 1;
   }
   return { y, map };
 }
@@ -497,8 +522,8 @@ function certify(
     const bSet = new Set(rederived.map((p) => pairKey(p.open, p.close)));
 
     const projected = accepted.map((p) => ({
-      open: map[p.open] as number,
-      close: map[p.close] as number,
+      open: map === null ? p.open : (map[p.open] as number),
+      close: map === null ? p.close : (map[p.close] as number),
     }));
     const projSet = new Set(projected.map((p) => pairKey(p.open, p.close)));
 

@@ -124,6 +124,8 @@ export interface Prepared {
   readonly abbreviations: readonly (readonly number[])[];
   /** N5's three lists in one array, longest first (nbsp.md §3.7 step 1). */
   readonly units: readonly UnitEntry[];
+  /** `units` bucketed by first code point, each bucket keeping the longest-first order. */
+  readonly unitsByFirst: ReadonlyMap<number, readonly UnitEntry[]>;
   readonly beforeNumber: readonly (readonly number[])[];
   readonly beforeWord: readonly (readonly number[])[];
   readonly symbols: readonly (readonly number[])[];
@@ -175,6 +177,32 @@ function prepareUnits(data: LocaleData["nbsp"]): UnitEntry[] {
   }
   out.sort((a, b) => b.w.length - a.w.length);
   return out;
+}
+
+/** The index `findUnit` reads: entries are matched exactly, so a unit can only start at its first code point. */
+function indexUnitsByFirst(units: readonly UnitEntry[]): Map<number, UnitEntry[]> {
+  const byFirst = new Map<number, UnitEntry[]>();
+  for (const candidate of units) {
+    const first = candidate.w[0] as number;
+    const bucket = byFirst.get(first);
+    if (bucket === undefined) byFirst.set(first, [candidate]);
+    else bucket.push(candidate);
+  }
+  return byFirst;
+}
+
+/** The longest unit entry (§3.7 step 1) that matches at `a`, or `undefined`. */
+export function findUnit(
+  cp: readonly number[],
+  a: number,
+  prep: Prepared,
+): { readonly w: readonly number[]; readonly kind: UnitKind } | undefined {
+  const bucket = prep.unitsByFirst.get(cp[a] as number);
+  if (bucket === undefined) return undefined;
+  for (const candidate of bucket) {
+    if (matchExact(cp, a, candidate.w)) return candidate;
+  }
+  return undefined;
 }
 
 /**
@@ -229,12 +257,14 @@ export function prepare(locale: LocaleData, narrowTarget: number = NNBSP): Prepa
     quotePairs.push({ open, close, target: pair.innerSpace === "nbsp" ? NBSP : narrowTarget });
   }
 
+  const units = prepareUnits(data);
   return {
     beforePunctuation,
     narrowBeforePunctuation,
     shortWords: prepareList(data.afterShortWords),
     abbreviations: prepareList(data.abbreviations),
-    units: prepareUnits(data),
+    units,
+    unitsByFirst: indexUnitsByFirst(units),
     beforeNumber: prepareList(data.beforeNumber),
     beforeWord: prepareList(data.beforeWord),
     symbols: prepareList(data.afterSymbols),
@@ -546,13 +576,7 @@ function isRightOperandOfMultiplication(cp: readonly number[], b: number): boole
 function unitsSubRule(cp: readonly number[], prep: Prepared, claims: Claims): void {
   if (prep.units.length === 0) return;
   for (let a = 0; a < cp.length; a += 1) {
-    let entry: UnitEntry | undefined;
-    for (const candidate of prep.units) {
-      if (matchExact(cp, a, candidate.w)) {
-        entry = candidate;
-        break;
-      }
-    }
+    const entry = findUnit(cp, a, prep);
     if (entry === undefined) continue;
     const k = entry.w.length;
     if (isAlnum(at(cp, a + k))) continue;
