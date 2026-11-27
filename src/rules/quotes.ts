@@ -60,6 +60,11 @@ function v1Identity(cp: number): number {
   return cp === SQ ? RIGHT_SINGLE_QUOTE : cp;
 }
 
+/** spec 3.2 `TW`: the two identities `V1ID` maps the typewriter marks to. */
+function isTypewriter(v1: number): boolean {
+  return v1 === 0x22 || v1 === RIGHT_SINGLE_QUOTE;
+}
+
 /** spec 3.1 `WIDE` / `NARROW`. `WIDE ∪ NARROW = QUOTEMARK`, and the two are disjoint. `NARROW`
  * is imported from `./quote-ambiguity.js`, shared with `apostrophe` (spec 0.5.0). */
 const WIDE: ReadonlySet<number> = new Set([
@@ -109,7 +114,16 @@ const SPACELIKE: ReadonlySet<number> = new Set([...INLINE_SPACE, ...BREAK]);
  * back to per-glyph lists: it is what makes a candidate's verdict independent of *which* quote
  * glyph its neighbour is.
  */
-const OPENISH: ReadonlySet<number> = new Set([MARKER, 0x28, 0x5b, 0x7b, ...WIDE, ...NARROW]);
+const OPENISH: ReadonlySet<number> = new Set([
+  MARKER,
+  0x28,
+  0x5b,
+  0x7b,
+  0xbf,
+  0xa1,
+  ...WIDE,
+  ...NARROW,
+]);
 
 const CLOSEISH: ReadonlySet<number> = new Set([
   MARKER,
@@ -332,6 +346,50 @@ function collectCandidates(
       canClose = false;
     }
 
+    // Quoted-lone-mark veto (spec 3.2, 1.33.0): a typewriter mark alone between two typewriter
+    // marks of the other identity — `'"'`, `"'"` — is a mention of that character, not a quotation.
+    // Both outer marks are declined. `next`/`prev` skip an INLINE-SPACE run only where `nbsp` can
+    // insert one, the same gap V1 reads, so the verdict survives `nbsp` acting between passes.
+    if (isTypewriter(gV1)) {
+      const isSpaceAt = (k: number): boolean => k >= 0 && k < n && INLINE_SPACE.has(at(arr, k));
+      const stepRight = (a: number): number => {
+        let k = a + 1;
+        if (skip.spaceRight.has(at(arr, a))) {
+          while (isSpaceAt(k)) k += 1;
+        } else if (isSpaceAt(k)) {
+          let after = k;
+          while (isSpaceAt(after)) after += 1;
+          if (after >= n || !skip.spaceLeft.has(at(arr, after))) return NONE;
+          k = after;
+        }
+        return k < n ? k : NONE;
+      };
+      const stepLeft = (a: number): number => {
+        let k = a - 1;
+        if (skip.spaceLeft.has(at(arr, a))) {
+          while (isSpaceAt(k)) k -= 1;
+        } else if (isSpaceAt(k)) {
+          let before = k;
+          while (isSpaceAt(before)) before -= 1;
+          if (before < 0 || !skip.spaceRight.has(at(arr, before))) return NONE;
+          k = before;
+        }
+        return k >= 0 ? k : NONE;
+      };
+      const isLoneMarkAround = (step: (a: number) => number): boolean => {
+        const m = step(i);
+        if (m === NONE) return false;
+        const mV1 = v1Identity(at(arr, m));
+        if (!isTypewriter(mV1) || mV1 === gV1) return false;
+        const o = step(m);
+        return o !== NONE && v1Identity(at(arr, o)) === gV1;
+      };
+      if (isLoneMarkAround(stepRight) || isLoneMarkAround(stepLeft)) {
+        canOpen = false;
+        canClose = false;
+      }
+    }
+
     if (canOpen || canClose) {
       candidates.push({ index: i, wide: WIDE.has(g), canOpen, canClose });
     }
@@ -498,6 +556,9 @@ function pairSetsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean 
  * intersection fails to shrink `A`, the pair with the greatest `open` index is forced out — both
  * clauses are normative (spec 3.5), so two ports cannot disagree.
  */
+/** spec 3.5: the certification loop's round bound. Part of the contract, not a tuning knob. */
+const GATE_ROUNDS_MAX = 8;
+
 function certify(
   arr: readonly number[],
   initialPairs: readonly Pair[],
@@ -505,12 +566,9 @@ function certify(
   skip: SkipSets,
 ): Pair[] {
   let accepted: Pair[] = initialPairs.slice();
-  // Each round accepts or strictly shrinks `accepted`; it is finite and ∅ accepts
-  // unconditionally, so the loop runs at most |A0| + 1 times (spec 3.5). The cap is a defensive
-  // safety net, not a normative bound.
-  const cap = initialPairs.length + 2;
-
-  for (let round = 0; round <= cap; round += 1) {
+  // spec 3.5: at most GATE_ROUNDS_MAX rounds; a round that is not accepted by the last one falls
+  // back to the empty set, which is the loop's unconditional fixed point.
+  for (let round = 1; round <= GATE_ROUNDS_MAX; round += 1) {
     if (accepted.length === 0) return accepted;
 
     const plan = computeRenderPlan(arr, accepted, ctx);
@@ -545,7 +603,6 @@ function certify(
     }
   }
 
-  // Unreachable given the termination argument; declines everything rather than looping.
   return [];
 }
 
