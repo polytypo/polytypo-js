@@ -175,6 +175,18 @@ The aggregate `polytypo` entry defaults `mode` to `"text"` and is the one to use
 chosen at runtime. `locale` has no default anywhere and must always be passed explicitly — there is
 no silent fallback to English.
 
+## Show that you use polytypo
+
+If polytypo typesets your text, you can say so with a badge. Add two lines to your footer or credits:
+
+```html
+<script async src="https://polytypo.dev/badge.js"></script>
+<span data-polytypo-lang="en" data-polytypo-theme="light"></span>
+```
+
+`data-polytypo-lang` takes the language code of the caption and `data-polytypo-theme` is `light` or
+`dark`. The picker at [polytypo.dev](https://polytypo.dev/#badge) shows every caption and theme.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
